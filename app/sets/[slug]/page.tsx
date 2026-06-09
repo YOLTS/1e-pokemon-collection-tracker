@@ -46,6 +46,17 @@ export default async function SetDetailPage({ params }: SetDetailPageProps) {
 
   const variants = set.cards.flatMap((card) => card.variants);
   const summary = summarizeVariants(variants);
+  const rarityBreakdown = Array.from(
+    variants.reduce((map, variant) => {
+      const current = map.get(variant.card.rarity) ?? { total: 0, owned: 0 };
+      current.total += 1;
+      if (variant.ownedItems.some((item) => item.status === "OWNED")) {
+        current.owned += 1;
+      }
+      map.set(variant.card.rarity, current);
+      return map;
+    }, new Map<string, { total: number; owned: number }>()),
+  );
 
   return (
     <div className="space-y-6">
@@ -81,6 +92,25 @@ export default async function SetDetailPage({ params }: SetDetailPageProps) {
         <StatCard label="Missing" value={String(summary.missingVariants)} tone="rose" />
         <StatCard label="Owned value" value={formatCurrency(summary.estimatedCollectionValue)} tone="green" />
         <StatCard label="Remaining cost" value={formatCurrency(summary.estimatedRemainingCost)} tone="amber" />
+      </section>
+
+      <section className="rounded-lg border border-white/10 bg-white/[0.05] p-4 shadow-soft backdrop-blur">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-lg font-black text-white">Rarity progress</h2>
+            <p className="mt-1 text-sm text-slate-400">Owned cards by rarity in this set</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {rarityBreakdown.map(([rarity, counts]) => (
+              <span
+                key={rarity}
+                className="rounded-md border border-white/10 bg-slate-950/60 px-3 py-2 text-xs font-bold text-slate-300"
+              >
+                {rarity}: <span className="text-white">{counts.owned}/{counts.total}</span>
+              </span>
+            ))}
+          </div>
+        </div>
       </section>
 
       <VariantTable variants={variants} />

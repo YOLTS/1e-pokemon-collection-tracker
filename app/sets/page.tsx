@@ -33,7 +33,7 @@ export default async function SetsPage() {
           <p className="text-sm font-bold uppercase tracking-widest text-emerald-300">Vintage set catalog</p>
           <h1 className="mt-2 text-4xl font-black text-white">English 1st Edition sets</h1>
           <p className="mt-3 max-w-3xl text-slate-400">
-            All 10 vintage sets that include 1st Edition English cards are modeled here. Base Set, Jungle, and Fossil currently include seeded sample card variants.
+            All 10 vintage sets that include 1st Edition English cards are imported from your spreadsheet and tracked as one master checklist.
           </p>
         </div>
       </div>
@@ -49,6 +49,10 @@ export default async function SetsPage() {
         {sets.map((set) => {
           const setVariants = set.cards.flatMap((card) => card.variants);
           const summary = summarizeVariants(setVariants);
+          const holoVariants = setVariants.filter((variant) => variant.finish === "HOLO");
+          const holoOwned = holoVariants.filter((variant) =>
+            variant.ownedItems.some((item) => item.status === "OWNED"),
+          ).length;
 
           return (
             <SetProgressCard
@@ -57,6 +61,11 @@ export default async function SetsPage() {
               owned={summary.ownedVariants}
               total={summary.totalVariants}
               completion={summary.completion}
+              missing={summary.missingVariants}
+              ownedValue={summary.estimatedCollectionValue}
+              remainingValue={summary.estimatedRemainingCost}
+              holoOwned={holoOwned}
+              holoTotal={holoVariants.length}
             />
           );
         })}

@@ -1,15 +1,30 @@
 import Link from "next/link";
 import type { PokemonSet } from "@prisma/client";
-import { formatPercent } from "@/lib/format";
+import { formatCurrency, formatPercent } from "@/lib/format";
 
 type SetProgressCardProps = {
   set: Pick<PokemonSet, "name" | "slug" | "symbol" | "symbolLabel" | "totalCards" | "releaseYear" | "color">;
   owned: number;
   total: number;
   completion: number;
+  missing?: number;
+  ownedValue?: number;
+  remainingValue?: number;
+  holoOwned?: number;
+  holoTotal?: number;
 };
 
-export function SetProgressCard({ set, owned, total, completion }: SetProgressCardProps) {
+export function SetProgressCard({
+  set,
+  owned,
+  total,
+  completion,
+  missing = Math.max(total - owned, 0),
+  ownedValue = 0,
+  remainingValue = 0,
+  holoOwned,
+  holoTotal,
+}: SetProgressCardProps) {
   return (
     <Link
       href={`/sets/${set.slug}`}
@@ -39,7 +54,25 @@ export function SetProgressCard({ set, owned, total, completion }: SetProgressCa
           style={{ width: `${Math.max(0, Math.min(100, completion))}%` }}
         />
       </div>
-      <p className="mt-3 text-sm font-semibold text-slate-300">{formatPercent(completion)} complete</p>
+      <div className="mt-3 flex items-center justify-between gap-3 text-sm">
+        <p className="font-semibold text-slate-300">{formatPercent(completion)} complete</p>
+        <p className="font-semibold text-slate-500">{missing} missing</p>
+      </div>
+      <div className="mt-5 grid grid-cols-2 gap-3 border-t border-white/10 pt-4 text-sm">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Owned value</p>
+          <p className="mt-1 font-black text-white">{formatCurrency(ownedValue)}</p>
+        </div>
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Remaining</p>
+          <p className="mt-1 font-black text-white">{formatCurrency(remainingValue)}</p>
+        </div>
+        {holoTotal !== undefined && holoOwned !== undefined ? (
+          <div className="col-span-2 rounded-md border border-violet-300/20 bg-violet-400/10 px-3 py-2 text-xs font-bold text-violet-200">
+            Holo progress: {holoOwned}/{holoTotal}
+          </div>
+        ) : null}
+      </div>
     </Link>
   );
 }

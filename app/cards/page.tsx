@@ -96,7 +96,7 @@ export default async function CardsPage({ searchParams }: CardsPageProps) {
         <StatCard
           label="View"
           value={selectedSet?.name ?? "All sets"}
-          helper={selectedSet ? `${selectedSet.totalCards} checklist cards` : "Seeded sample variants"}
+          helper={selectedSet ? `${selectedSet.totalCards} checklist cards` : "Spreadsheet-imported master list"}
           tone="cyan"
         />
         <StatCard label="Variants" value={String(summary.totalVariants)} />
@@ -109,7 +109,7 @@ export default async function CardsPage({ searchParams }: CardsPageProps) {
         <VariantTable variants={variants} showSet={!selectedSet} />
       ) : (
         <section className="rounded-lg border border-white/10 bg-white/[0.05] p-8 text-center shadow-soft backdrop-blur">
-          <p className="font-semibold text-slate-400">No sample cards have been seeded for this set yet.</p>
+          <p className="font-semibold text-slate-400">No cards match this view.</p>
           <Link href="/sets" className="mt-4 inline-flex text-sm font-bold text-emerald-300 hover:text-white">
             Back to sets
           </Link>

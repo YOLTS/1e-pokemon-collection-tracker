@@ -46,10 +46,11 @@ export default async function DashboardPage() {
   ]);
 
   const summary = summarizeVariants(variants);
+  const ownedRate = `${summary.ownedVariants} owned / ${summary.missingVariants} missing`;
 
   return (
     <div className="space-y-8">
-      <section className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+      <section className="grid gap-6 lg:grid-cols-[1fr_360px]">
         <div className="rounded-lg border border-white/10 bg-white/[0.05] p-6 shadow-soft backdrop-blur sm:p-8">
           <p className="text-sm font-bold uppercase tracking-widest text-emerald-300">Master set portfolio</p>
           <h1 className="mt-3 text-4xl font-black text-white sm:text-5xl">
@@ -58,6 +59,20 @@ export default async function DashboardPage() {
           <p className="mt-4 max-w-2xl text-base leading-7 text-slate-400">
             Track master-set progress, owned inventory, graded and raw copies, placeholder values, and future-ready pricing data across the WOTC vintage era.
           </p>
+          <div className="mt-7 grid gap-3 sm:grid-cols-3">
+            <div className="rounded-lg border border-white/10 bg-slate-950/50 p-4">
+              <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Master targets</p>
+              <p className="mt-2 text-2xl font-black text-white">{summary.totalVariants}</p>
+            </div>
+            <div className="rounded-lg border border-emerald-300/20 bg-emerald-400/10 p-4">
+              <p className="text-xs font-bold uppercase tracking-wide text-emerald-200/70">Owned</p>
+              <p className="mt-2 text-2xl font-black text-white">{summary.ownedVariants}</p>
+            </div>
+            <div className="rounded-lg border border-rose-300/20 bg-rose-400/10 p-4">
+              <p className="text-xs font-bold uppercase tracking-wide text-rose-200/70">Missing</p>
+              <p className="mt-2 text-2xl font-black text-white">{summary.missingVariants}</p>
+            </div>
+          </div>
           <div className="mt-6 flex flex-wrap gap-3">
             <Link
               href="/sets"
@@ -74,17 +89,18 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        <section className="flex items-center justify-center rounded-lg border border-white/10 bg-slate-950/70 p-6 shadow-soft backdrop-blur">
+        <section className="flex flex-col items-center justify-center rounded-lg border border-white/10 bg-slate-950/70 p-6 text-center shadow-soft backdrop-blur">
           <ProgressDonut value={summary.completion} label="complete" />
+          <p className="mt-5 text-sm font-semibold text-slate-300">{ownedRate}</p>
+          <p className="mt-1 text-xs text-slate-500">Across all spreadsheet-imported master targets</p>
         </section>
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        <StatCard label="Owned cards" value={String(summary.ownedVariants)} tone="green" />
-        <StatCard label="Missing cards" value={String(summary.missingVariants)} tone="rose" />
-        <StatCard label="Master targets" value={String(summary.totalVariants)} tone="cyan" />
-        <StatCard label="Collection value" value={formatCurrency(summary.estimatedCollectionValue)} tone="green" />
-        <StatCard label="Remaining cost" value={formatCurrency(summary.estimatedRemainingCost)} tone="amber" />
+      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard label="Completion" value={`${Math.round(summary.completion)}%`} helper={ownedRate} tone="cyan" />
+        <StatCard label="Collection value" value={formatCurrency(summary.estimatedCollectionValue)} helper="From market values in the spreadsheet" tone="green" />
+        <StatCard label="Remaining cost" value={formatCurrency(summary.estimatedRemainingCost)} helper="Missing-card market value total" tone="amber" />
+        <StatCard label="Recent additions" value={String(recentItems.length)} helper="Latest owned inventory records" />
       </section>
 
       <section className="grid gap-6 lg:grid-cols-[1fr_0.8fr]">
@@ -99,6 +115,10 @@ export default async function DashboardPage() {
             {sets.slice(0, 6).map((set) => {
               const setVariants = set.cards.flatMap((card) => card.variants);
               const setSummary = summarizeVariants(setVariants);
+              const holoVariants = setVariants.filter((variant) => variant.finish === "HOLO");
+              const holoOwned = holoVariants.filter((variant) =>
+                variant.ownedItems.some((item) => item.status === "OWNED"),
+              ).length;
 
               return (
                 <SetProgressCard
@@ -107,6 +127,11 @@ export default async function DashboardPage() {
                   owned={setSummary.ownedVariants}
                   total={setSummary.totalVariants}
                   completion={setSummary.completion}
+                  missing={setSummary.missingVariants}
+                  ownedValue={setSummary.estimatedCollectionValue}
+                  remainingValue={setSummary.estimatedRemainingCost}
+                  holoOwned={holoOwned}
+                  holoTotal={holoVariants.length}
                 />
               );
             })}
