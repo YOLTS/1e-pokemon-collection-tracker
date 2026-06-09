@@ -1,0 +1,57 @@
+export const CARD_CATEGORY = {
+  POKEMON: "POKEMON",
+  TRAINER: "TRAINER",
+  ENERGY: "ENERGY",
+} as const;
+
+export const CARD_CONDITION = {
+  NOT_ASSESSED: "NOT_ASSESSED",
+  POOR: "POOR",
+  LIGHT_PLAYED: "LIGHT_PLAYED",
+  MODERATELY_PLAYED: "MODERATELY_PLAYED",
+  HEAVILY_PLAYED: "HEAVILY_PLAYED",
+  NEAR_MINT: "NEAR_MINT",
+  MINT: "MINT",
+} as const;
+
+export const EDITION = {
+  FIRST_EDITION: "FIRST_EDITION",
+  UNLIMITED: "UNLIMITED",
+} as const;
+
+export const FINISH = {
+  HOLO: "HOLO",
+  NON_HOLO: "NON_HOLO",
+  REVERSE_HOLO: "REVERSE_HOLO",
+} as const;
+
+export const GRADING_COMPANY = {
+  RAW: "RAW",
+  PSA: "PSA",
+  BGS: "BGS",
+  CGC: "CGC",
+  SGC: "SGC",
+  OTHER: "OTHER",
+} as const;
+
+export const OWNERSHIP_STATUS = {
+  OWNED: "OWNED",
+  MISSING: "MISSING",
+  WISHLIST: "WISHLIST",
+} as const;
+
+export const ACQUISITION_SOURCE = {
+  UNKNOWN: "UNKNOWN",
+  PACK_PULL: "PACK_PULL",
+  LOCAL_CARD_SHOP: "LOCAL_CARD_SHOP",
+  EBAY: "EBAY",
+  TCGPLAYER: "TCGPLAYER",
+  TRADE: "TRADE",
+  PRIVATE_SALE: "PRIVATE_SALE",
+} as const;
+
+export const PRICE_SOURCE = {
+  MANUAL: "MANUAL",
+  FUTURE_API: "FUTURE_API",
+  RECENT_SALE: "RECENT_SALE",
+} as const;
