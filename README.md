@@ -97,11 +97,25 @@ npm run dev
 ```bash
 npm run lint
 npm run build
+npm run clean:next
+npm run verify:ui
 npm run prisma:generate
 npm run prisma:migrate -- --name your_migration_name
 npm run prisma:seed -- --dry-run
 npm run prisma:seed
 ```
+
+## Required UI Safety Check
+
+After every UI, styling, routing, or feature change, run the browser-route verification before calling the work done:
+
+```bash
+npm.cmd run clean:next
+npm.cmd run dev
+npm.cmd run verify:ui
+```
+
+The verification checks `/`, `/sets`, `/cards`, and `/sets/base-set`, confirms `app/page.tsx` still exports the dashboard route, and confirms compiled Tailwind/global CSS is being served. See `docs/development-safety-checklist.md` for the full checklist.
 
 ## Reset Local Data
 

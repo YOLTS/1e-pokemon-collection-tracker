@@ -28,37 +28,44 @@ export function SetProgressCard({
   return (
     <Link
       href={`/sets/${set.slug}`}
-      className="group rounded-lg border border-white/10 bg-white/[0.05] p-5 shadow-soft backdrop-blur transition duration-200 hover:-translate-y-0.5 hover:border-emerald-300/40 hover:bg-white/[0.08]"
+      className="neon-panel neon-panel-hover group rounded-lg p-5"
     >
+      <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-300 via-fuchsia-300 to-amber-300 opacity-70" />
       <div className="flex items-start justify-between gap-4">
-        <div>
-          <div
-            className="mb-4 grid size-12 place-items-center rounded-lg text-sm font-black text-slate-950"
-            style={{ backgroundColor: set.color }}
-            title={set.symbolLabel}
-          >
-            {set.symbol}
+        <div className="flex items-start gap-4">
+          <div className="rounded-xl border border-cyan-300/15 bg-slate-950/55 p-2 shadow-glow">
+            <div
+              className="grid size-14 place-items-center rounded-lg text-base font-black text-slate-950 shadow-[0_0_28px_rgba(34,211,238,0.24)] ring-1 ring-white/25"
+              style={{ backgroundColor: set.color }}
+              title={set.symbolLabel}
+            >
+              {set.symbol}
+            </div>
           </div>
-          <h2 className="text-xl font-black text-white">{set.name}</h2>
-          <p className="mt-1 text-sm text-slate-400">
-            {set.releaseYear} - {set.totalCards} checklist cards
-          </p>
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-amber-200/80">1st Edition archive</p>
+            <h2 className="mt-1 text-xl font-black text-white">{set.name}</h2>
+            <p className="mt-1 text-sm text-slate-400">
+              {set.releaseYear} - {set.totalCards} checklist cards
+            </p>
+          </div>
         </div>
-        <span className="rounded-md bg-white/10 px-2 py-1 text-xs font-bold text-slate-300">
+        <span className="rounded-md border border-cyan-300/25 bg-cyan-300/10 px-2 py-1 text-xs font-black text-cyan-100 shadow-glow">
           {owned}/{total || 0}
         </span>
       </div>
-      <div className="mt-6 h-3 overflow-hidden rounded-full bg-slate-800">
+      <div className="mt-6 h-3 overflow-hidden rounded-full bg-slate-950/80 shadow-inner shadow-black/50 ring-1 ring-white/10">
         <div
-          className="h-full rounded-full bg-emerald-400 transition-all duration-500"
+          className="h-full rounded-full bg-gradient-to-r from-cyan-300 via-emerald-300 to-amber-300 shadow-[0_0_20px_rgba(251,191,36,0.4)] transition-all duration-500"
           style={{ width: `${Math.max(0, Math.min(100, completion))}%` }}
         />
       </div>
       <div className="mt-3 flex items-center justify-between gap-3 text-sm">
-        <p className="font-semibold text-slate-300">{formatPercent(completion)} complete</p>
+        <p className="font-semibold text-cyan-100">{formatPercent(completion)} complete</p>
         <p className="font-semibold text-slate-500">{missing} missing</p>
       </div>
-      <div className="mt-5 grid grid-cols-2 gap-3 border-t border-white/10 pt-4 text-sm">
+      <div className="neon-divider mt-5" />
+      <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
         <div>
           <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Owned value</p>
           <p className="mt-1 font-black text-white">{formatCurrency(ownedValue)}</p>
@@ -68,7 +75,7 @@ export function SetProgressCard({
           <p className="mt-1 font-black text-white">{formatCurrency(remainingValue)}</p>
         </div>
         {holoTotal !== undefined && holoOwned !== undefined ? (
-          <div className="col-span-2 rounded-md border border-violet-300/20 bg-violet-400/10 px-3 py-2 text-xs font-bold text-violet-200">
+          <div className="col-span-2 rounded-md border border-fuchsia-300/25 bg-fuchsia-400/10 px-3 py-2 text-xs font-bold text-fuchsia-100 shadow-magenta">
             Holo progress: {holoOwned}/{holoTotal}
           </div>
         ) : null}

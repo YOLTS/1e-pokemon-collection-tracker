@@ -1,0 +1,17 @@
+
+> pokemon-collection-tracker@0.1.0 dev
+> next dev
+
+  ▲ Next.js 14.2.23
+  - Local:        http://localhost:3000
+  - Environments: .env
+
+ ✓ Starting...
+ ✓ Ready in 2.6s
+ ○ Compiling / ...
+ ✓ Compiled / in 2.4s (512 modules)
+ GET / 200 in 73ms
+ GET / 200 in 85ms
+ GET / 200 in 76ms
+ GET / 200 in 87ms
+ ✓ Compiled in 334ms (512 modules)

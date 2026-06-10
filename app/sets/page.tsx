@@ -30,11 +30,12 @@ export default async function SetsPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-sm font-bold uppercase tracking-widest text-emerald-300">Vintage set catalog</p>
+          <p className="neon-eyebrow text-sm font-bold uppercase tracking-widest">Vintage set catalog</p>
           <h1 className="mt-2 text-4xl font-black text-white">English 1st Edition sets</h1>
           <p className="mt-3 max-w-3xl text-slate-400">
             All 10 vintage sets that include 1st Edition English cards are imported from your spreadsheet and tracked as one master checklist.
           </p>
+          <div className="neon-divider mt-5 max-w-xl" />
         </div>
       </div>
 

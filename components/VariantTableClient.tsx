@@ -46,17 +46,17 @@ type OwnedFilter = "all" | "owned" | "missing";
 type SortKey = "checklist" | "name" | "rarity" | "owned" | "value";
 
 const rarityTone: Record<string, string> = {
-  "Rare Holo": "border-violet-300/30 bg-violet-400/15 text-violet-200",
-  Rare: "border-cyan-300/30 bg-cyan-400/15 text-cyan-200",
-  Uncommon: "border-emerald-300/30 bg-emerald-400/15 text-emerald-200",
+  "Rare Holo": "border-fuchsia-300/[0.35] bg-fuchsia-400/15 text-fuchsia-100 shadow-magenta",
+  Rare: "border-cyan-300/[0.35] bg-cyan-400/15 text-cyan-100 shadow-glow",
+  Uncommon: "border-sky-300/30 bg-sky-400/[0.12] text-sky-100",
   Common: "border-slate-300/20 bg-slate-300/10 text-slate-300",
-  Energy: "border-amber-300/30 bg-amber-400/15 text-amber-200",
-  "Rare Secret": "border-fuchsia-300/30 bg-fuchsia-400/15 text-fuchsia-200",
-  "Rare Shining": "border-rose-300/30 bg-rose-400/15 text-rose-200",
+  Energy: "border-amber-300/[0.35] bg-amber-400/15 text-amber-100 shadow-amber",
+  "Rare Secret": "border-amber-300/40 bg-gradient-to-r from-amber-300/20 to-fuchsia-400/15 text-amber-100 shadow-amber",
+  "Rare Shining": "border-pink-300/40 bg-pink-400/15 text-pink-100 shadow-magenta",
 };
 
 function rarityClass(rarity: string) {
-  return rarityTone[rarity] ?? "border-white/15 bg-white/10 text-slate-200";
+  return rarityTone[rarity] ?? "border-cyan-300/15 bg-white/10 text-slate-200";
 }
 
 function cardNumberValue(cardNumber: string) {
@@ -166,11 +166,13 @@ export function VariantTableClient({
   const visibleOwned = filteredVariants.filter(hasOwnedCopy).length;
 
   return (
-    <section className="rounded-lg border border-white/10 bg-white/[0.04] shadow-soft backdrop-blur">
-      <div className="border-b border-white/10 bg-slate-950/60 p-4">
+    <section className="neon-panel overflow-hidden rounded-lg">
+      <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-300 via-fuchsia-300 to-amber-300 opacity-70" />
+      <div className="border-b border-cyan-300/10 bg-slate-950/[0.62] p-4">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
           <div>
-            <h2 className="text-lg font-black text-white">Card checklist</h2>
+            <p className="neon-eyebrow text-xs font-black uppercase tracking-widest">Inventory console</p>
+            <h2 className="mt-1 text-lg font-black text-white">Card checklist</h2>
             <p className="mt-1 text-sm text-slate-400">
               Showing {filteredVariants.length} of {variants.length} cards, {visibleOwned} owned
             </p>
@@ -182,7 +184,7 @@ export function VariantTableClient({
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Name, number, set, notes"
-                className="mt-1 h-10 w-full rounded-md border border-white/10 bg-slate-950 px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-emerald-300"
+                className="field-control mt-1 h-10 w-full rounded-md px-3 text-sm text-white outline-none transition placeholder:text-slate-600"
               />
             </label>
             <label className="block">
@@ -190,7 +192,7 @@ export function VariantTableClient({
               <select
                 value={ownedFilter}
                 onChange={(event) => setOwnedFilter(event.target.value as OwnedFilter)}
-                className="mt-1 h-10 w-full rounded-md border border-white/10 bg-slate-950 px-3 text-sm font-semibold text-white outline-none focus:border-emerald-300"
+                className="field-control mt-1 h-10 w-full rounded-md px-3 text-sm font-semibold text-white outline-none transition"
               >
                 <option value="all">All cards</option>
                 <option value="owned">Owned only</option>
@@ -202,7 +204,7 @@ export function VariantTableClient({
               <select
                 value={rarityFilter}
                 onChange={(event) => setRarityFilter(event.target.value)}
-                className="mt-1 h-10 w-full rounded-md border border-white/10 bg-slate-950 px-3 text-sm font-semibold text-white outline-none focus:border-emerald-300"
+                className="field-control mt-1 h-10 w-full rounded-md px-3 text-sm font-semibold text-white outline-none transition"
               >
                 <option value="all">All rarities</option>
                 {rarityOptions.map((rarity) => (
@@ -217,7 +219,7 @@ export function VariantTableClient({
               <select
                 value={sortKey}
                 onChange={(event) => setSortKey(event.target.value as SortKey)}
-                className="mt-1 h-10 w-full rounded-md border border-white/10 bg-slate-950 px-3 text-sm font-semibold text-white outline-none focus:border-emerald-300"
+                className="field-control mt-1 h-10 w-full rounded-md px-3 text-sm font-semibold text-white outline-none transition"
               >
                 <option value="checklist">Checklist order</option>
                 <option value="name">Card name</option>
@@ -231,8 +233,8 @@ export function VariantTableClient({
       </div>
 
       <div className="overflow-x-auto rounded-b-lg">
-        <table className="min-w-[1180px] divide-y divide-white/10 text-left text-sm">
-          <thead className="bg-white/[0.04] text-xs font-black uppercase tracking-wide text-slate-400">
+        <table className="min-w-[1180px] divide-y divide-cyan-300/10 text-left text-sm">
+          <thead className="bg-cyan-300/[0.05] text-xs font-black uppercase tracking-wide text-slate-400">
             <tr>
               {showSet ? <th className="px-4 py-3">Set</th> : null}
               <th className="px-4 py-3">No.</th>
@@ -244,23 +246,23 @@ export function VariantTableClient({
               <th className="px-4 py-3 text-right">Value</th>
               <th className="px-4 py-3 text-right">Paid</th>
               <th className="px-4 py-3">Notes</th>
-              <th className="sticky right-0 bg-slate-950/95 px-4 py-3 text-right shadow-[-16px_0_24px_rgba(2,6,23,0.55)]">
+              <th className="sticky right-0 bg-slate-950/95 px-4 py-3 text-right shadow-[-16px_0_24px_rgba(2,6,23,0.7)]">
                 Action
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-white/10">
+          <tbody className="divide-y divide-cyan-300/10">
             {filteredVariants.map((variant) => {
               const owned = hasOwnedCopy(variant);
               const primaryCopy = getPrimaryCopy(variant);
 
               return (
-                <tr key={variant.id} className="align-top transition hover:bg-white/[0.05]">
+                <tr key={variant.id} className="align-top transition hover:bg-cyan-300/[0.055] hover:shadow-[inset_3px_0_0_rgba(34,211,238,0.65)]">
                   {showSet ? (
                     <td className="whitespace-nowrap px-4 py-4">
                       <span className="inline-flex items-center gap-2 font-bold text-white">
                         <span
-                          className="grid size-7 place-items-center rounded-md text-[10px] font-black text-slate-950"
+                          className="grid size-7 place-items-center rounded-md text-[10px] font-black text-slate-950 ring-1 ring-white/20"
                           style={{ backgroundColor: variant.card.set.color }}
                         >
                           {variant.card.set.symbol}
@@ -288,8 +290,8 @@ export function VariantTableClient({
                     <span
                       className={`inline-flex rounded-md border px-2 py-1 text-xs font-black ${
                         owned
-                          ? "border-emerald-300/30 bg-emerald-400/15 text-emerald-300"
-                          : "border-rose-300/30 bg-rose-400/15 text-rose-300"
+                          ? "border-cyan-300/[0.35] bg-cyan-400/15 text-cyan-100 shadow-glow"
+                          : "border-fuchsia-300/30 bg-fuchsia-400/[0.12] text-fuchsia-200"
                       }`}
                     >
                       {owned ? "Owned" : "Missing"}
@@ -312,11 +314,11 @@ export function VariantTableClient({
                   <td className="min-w-56 max-w-sm px-4 py-4 text-slate-400">
                     <span className="line-clamp-3">{primaryCopy?.notes || variant.notes || "-"}</span>
                   </td>
-                  <td className="sticky right-0 bg-slate-950/95 px-4 py-4 text-right shadow-[-16px_0_24px_rgba(2,6,23,0.55)]">
+                  <td className="sticky right-0 bg-slate-950/95 px-4 py-4 text-right shadow-[-16px_0_24px_rgba(2,6,23,0.7)]">
                     <div className="flex justify-end gap-2">
                       <Link
                         href={`/cards/${variant.id}`}
-                        className="whitespace-nowrap rounded-md border border-white/15 px-3 py-2 text-xs font-black text-white transition hover:border-cyan-300 hover:bg-cyan-300 hover:text-slate-950"
+                        className="btn-secondary whitespace-nowrap rounded-md px-3 py-2 text-xs font-black transition"
                       >
                         Details
                       </Link>
@@ -326,7 +328,7 @@ export function VariantTableClient({
                         <input type="hidden" name="owned" value={String(!owned)} />
                         <button
                           type="submit"
-                          className="whitespace-nowrap rounded-md border border-white/15 px-3 py-2 text-xs font-black text-white transition hover:border-emerald-300 hover:bg-emerald-300 hover:text-slate-950"
+                          className="btn-primary whitespace-nowrap rounded-md px-3 py-2 text-xs font-black transition"
                         >
                           {owned ? "Mark missing" : "Mark owned"}
                         </button>

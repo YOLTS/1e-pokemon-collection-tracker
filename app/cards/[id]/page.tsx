@@ -61,12 +61,12 @@ export default async function CardDetailPage({ params, searchParams }: CardDetai
     <div className="space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <Link href={`/sets/${variant.card.set.slug}`} className="text-sm font-bold text-emerald-300 hover:text-white">
+          <Link href={`/sets/${variant.card.set.slug}`} className="text-sm font-bold text-cyan-300 hover:text-white">
             Back to {variant.card.set.name}
           </Link>
           <div className="mt-4 flex items-center gap-4">
             <div
-              className="grid size-14 place-items-center rounded-lg text-base font-black text-slate-950"
+              className="grid size-14 place-items-center rounded-lg text-base font-black text-slate-950 shadow-glow ring-1 ring-white/20"
               style={{ backgroundColor: variant.card.set.color }}
             >
               {variant.card.set.symbol}
@@ -79,19 +79,20 @@ export default async function CardDetailPage({ params, searchParams }: CardDetai
               <p className="mt-2 text-slate-400">
                 {formatEnumLabel(variant.edition)} - {formatEnumLabel(variant.finish)} - {variant.card.rarity}
               </p>
+              <div className="neon-divider mt-4 max-w-md" />
             </div>
           </div>
         </div>
         <Link
           href="/cards"
-          className="inline-flex items-center justify-center rounded-md border border-white/15 px-4 py-3 text-sm font-black text-white transition hover:bg-white/10"
+          className="btn-secondary inline-flex items-center justify-center rounded-md px-4 py-3 text-sm font-black transition"
         >
           All cards
         </Link>
       </div>
 
       {searchParams.saved ? (
-        <div className="rounded-lg border border-emerald-300/20 bg-emerald-400/10 px-4 py-3 text-sm font-bold text-emerald-200">
+        <div className="rounded-lg border border-cyan-300/20 bg-cyan-400/10 px-4 py-3 text-sm font-bold text-cyan-100 shadow-glow">
           Card details saved.
         </div>
       ) : null}
@@ -108,7 +109,8 @@ export default async function CardDetailPage({ params, searchParams }: CardDetai
       </section>
 
       <section className="grid gap-6 lg:grid-cols-[0.75fr_1.25fr]">
-        <div className="rounded-lg border border-white/10 bg-white/[0.05] p-5 shadow-soft backdrop-blur">
+        <div className="neon-panel rounded-lg p-5">
+          <p className="neon-eyebrow text-xs font-black uppercase tracking-widest">Source identity</p>
           <h2 className="text-lg font-black text-white">Imported card identity</h2>
           <dl className="mt-4 space-y-4 text-sm">
             <div>
@@ -130,12 +132,13 @@ export default async function CardDetailPage({ params, searchParams }: CardDetai
           </dl>
         </div>
 
-        <form action={updateVariantDetails} className="rounded-lg border border-white/10 bg-white/[0.05] p-5 shadow-soft backdrop-blur">
+        <form action={updateVariantDetails} className="neon-panel rounded-lg p-5">
           <input type="hidden" name="variantId" value={variant.id} />
           <input type="hidden" name="setSlug" value={variant.card.set.slug} />
 
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
             <div>
+              <p className="neon-eyebrow text-xs font-black uppercase tracking-widest">Collection edit bay</p>
               <h2 className="text-lg font-black text-white">Collector details</h2>
               <p className="mt-1 text-sm text-slate-400">
                 Update mutable collection fields without changing spreadsheet-imported card identity.
@@ -143,7 +146,7 @@ export default async function CardDetailPage({ params, searchParams }: CardDetai
             </div>
             <button
               type="submit"
-              className="rounded-md bg-emerald-300 px-4 py-3 text-sm font-black text-slate-950 transition hover:bg-white"
+              className="btn-primary rounded-md px-4 py-3 text-sm font-black transition"
             >
               Save changes
             </button>
@@ -155,7 +158,7 @@ export default async function CardDetailPage({ params, searchParams }: CardDetai
               <select
                 name="condition"
                 defaultValue={primaryCopy?.condition ?? CARD_CONDITION.NOT_ASSESSED}
-                className="mt-1 h-11 w-full rounded-md border border-white/10 bg-slate-950 px-3 text-sm font-semibold text-white outline-none focus:border-emerald-300"
+                className="field-control mt-1 h-11 w-full rounded-md px-3 text-sm font-semibold text-white outline-none transition"
               >
                 {conditionOptions.map((condition) => (
                   <option key={condition} value={condition}>
@@ -173,7 +176,7 @@ export default async function CardDetailPage({ params, searchParams }: CardDetai
                 min="0"
                 step="0.01"
                 defaultValue={variant.estimatedValue || ""}
-                className="mt-1 h-11 w-full rounded-md border border-white/10 bg-slate-950 px-3 text-sm font-semibold text-white outline-none focus:border-emerald-300"
+                className="field-control mt-1 h-11 w-full rounded-md px-3 text-sm font-semibold text-white outline-none transition"
               />
             </label>
 
@@ -185,13 +188,13 @@ export default async function CardDetailPage({ params, searchParams }: CardDetai
                 min="0"
                 step="0.01"
                 defaultValue={primaryCopy?.purchasePrice ?? ""}
-                className="mt-1 h-11 w-full rounded-md border border-white/10 bg-slate-950 px-3 text-sm font-semibold text-white outline-none focus:border-emerald-300"
+                className="field-control mt-1 h-11 w-full rounded-md px-3 text-sm font-semibold text-white outline-none transition"
               />
             </label>
 
             <label className="block">
               <span className="text-xs font-bold uppercase tracking-wide text-slate-500">Current status</span>
-              <div className="mt-1 flex h-11 items-center rounded-md border border-white/10 bg-slate-950 px-3 text-sm font-bold text-white">
+              <div className="field-control mt-1 flex h-11 items-center rounded-md px-3 text-sm font-bold text-white">
                 {owned ? "Owned" : "Missing"}
               </div>
             </label>
@@ -203,7 +206,7 @@ export default async function CardDetailPage({ params, searchParams }: CardDetai
               name="notes"
               rows={6}
               defaultValue={editableNotes}
-              className="mt-1 w-full rounded-md border border-white/10 bg-slate-950 px-3 py-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-emerald-300"
+              className="field-control mt-1 w-full rounded-md px-3 py-3 text-sm text-white outline-none transition placeholder:text-slate-600"
               placeholder="Condition details, acquisition context, binder notes"
             />
           </label>
