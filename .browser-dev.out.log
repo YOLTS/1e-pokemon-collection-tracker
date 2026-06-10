@@ -7,11 +7,12 @@
   - Environments: .env
 
  ✓ Starting...
- ✓ Ready in 2.6s
+ ✓ Ready in 1253ms
  ○ Compiling / ...
- ✓ Compiled / in 2.4s (512 modules)
- GET / 200 in 73ms
- GET / 200 in 85ms
- GET / 200 in 76ms
- GET / 200 in 87ms
- ✓ Compiled in 334ms (512 modules)
+ ✓ Compiled / in 1546ms (512 modules)
+ GET / 200 in 53ms
+ GET / 200 in 105ms
+ GET / 200 in 78ms
+ ✓ Compiled in 291ms (512 modules)
+ GET / 200 in 90ms
+ GET / 200 in 72ms

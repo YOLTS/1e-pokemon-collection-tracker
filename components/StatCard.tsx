@@ -15,7 +15,7 @@ const toneClasses = {
 
 export function StatCard({ label, value, helper, tone = "slate" }: StatCardProps) {
   return (
-    <section className={`neon-panel rounded-lg bg-gradient-to-br p-5 ${toneClasses[tone]}`}>
+    <section className={`neon-panel neon-panel-hover stat-card group rounded-lg bg-gradient-to-br p-5 ${toneClasses[tone]}`}>
       <div className="mb-4 h-1 w-16 rounded-full bg-gradient-to-r from-cyan-300 via-fuchsia-300 to-amber-300 shadow-glow" />
       <p className="text-sm font-semibold text-slate-400">{label}</p>
       <p className="mt-2 text-3xl font-black text-white drop-shadow-[0_0_18px_rgba(34,211,238,0.24)]">{value}</p>

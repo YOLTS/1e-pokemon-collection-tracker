@@ -93,7 +93,7 @@ export default async function CardsPage({ searchParams }: CardsPageProps) {
         </form>
       </div>
 
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <section className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-5 [&>*:last-child]:col-span-2 lg:[&>*:last-child]:col-span-1">
         <StatCard
           label="View"
           value={selectedSet?.name ?? "All sets"}

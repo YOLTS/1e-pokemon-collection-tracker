@@ -58,9 +58,17 @@ export default async function SetDetailPage({ params }: SetDetailPageProps) {
     }, new Map<string, { total: number; owned: number }>()),
   );
 
+  const rarityTone: Record<string, string> = {
+    "Rare Holo": "from-fuchsia-300 to-pink-400 text-fuchsia-100",
+    Rare: "from-cyan-300 to-sky-400 text-cyan-100",
+    Uncommon: "from-sky-300 to-blue-400 text-sky-100",
+    Common: "from-slate-300 to-slate-500 text-slate-200",
+    Energy: "from-amber-300 to-orange-400 text-amber-100",
+  };
+
   return (
     <div className="space-y-6">
-      <div className="grid gap-6 lg:grid-cols-[1fr_220px]">
+      <section className="neon-panel set-archive-header grid gap-6 rounded-lg p-5 sm:p-6 lg:grid-cols-[1fr_220px]">
         <div>
           <Link href="/sets" className="text-sm font-bold text-cyan-300 hover:text-white">
             Back to sets
@@ -77,7 +85,7 @@ export default async function SetDetailPage({ params }: SetDetailPageProps) {
               <p className="neon-eyebrow text-xs font-black uppercase tracking-widest">Set display file</p>
               <h1 className="text-4xl font-black text-white">{set.name}</h1>
               <p className="mt-1 text-slate-400">
-                {set.releaseYear} - {set.totalCards} original checklist cards - {set.series}
+                {set.releaseYear} · {set.totalCards} original checklist cards · {set.series}
               </p>
               <div className="neon-divider mt-4 max-w-md" />
             </div>
@@ -86,9 +94,9 @@ export default async function SetDetailPage({ params }: SetDetailPageProps) {
         <div className="flex justify-center lg:justify-end">
           <ProgressDonut value={summary.completion} label="set" size="sm" />
         </div>
-      </div>
+      </section>
 
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <section className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-5 [&>*:last-child]:col-span-2 lg:[&>*:last-child]:col-span-1">
         <StatCard label="Seeded variants" value={String(summary.totalVariants)} />
         <StatCard label="Owned" value={String(summary.ownedVariants)} tone="green" />
         <StatCard label="Missing" value={String(summary.missingVariants)} tone="rose" />
@@ -96,22 +104,34 @@ export default async function SetDetailPage({ params }: SetDetailPageProps) {
         <StatCard label="Remaining cost" value={formatCurrency(summary.estimatedRemainingCost)} tone="amber" />
       </section>
 
-      <section className="neon-panel rounded-lg p-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
+      <section className="neon-panel rounded-lg p-5">
+        <div className="grid gap-5 lg:grid-cols-[14rem_1fr] lg:items-center">
+          <div className="lg:border-r lg:border-cyan-300/10 lg:pr-5">
             <p className="neon-eyebrow text-xs font-black uppercase tracking-widest">Rarity signal</p>
             <h2 className="text-lg font-black text-white">Rarity progress</h2>
             <p className="mt-1 text-sm text-slate-400">Owned cards by rarity in this set</p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {rarityBreakdown.map(([rarity, counts]) => (
-              <span
-                key={rarity}
-                className="rounded-md border border-cyan-300/15 bg-slate-950/[0.65] px-3 py-2 text-xs font-bold text-slate-300"
-              >
-                {rarity}: <span className="text-white">{counts.owned}/{counts.total}</span>
-              </span>
-            ))}
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            {rarityBreakdown.map(([rarity, counts]) => {
+              const completion = counts.total ? (counts.owned / counts.total) * 100 : 0;
+              const visualCompletion = completion > 0 ? Math.max(4, completion) : 0;
+              const tone = rarityTone[rarity] ?? "from-cyan-300 to-fuchsia-300 text-cyan-100";
+
+              return (
+                <div key={rarity} className="rarity-progress-card rounded-lg border border-white/[0.08] bg-slate-950/[0.48] p-3">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <span className={`text-xs font-black ${tone.split(" ").at(-1)}`}>{rarity}</span>
+                    <span className="text-sm font-black text-white">{counts.owned}/{counts.total}</span>
+                  </div>
+                  <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-950 ring-1 ring-white/[0.08]">
+                    <div
+                      className={`h-full rounded-full bg-gradient-to-r ${tone.replace(/text-\S+/, "")} shadow-[0_0_12px_rgba(34,211,238,0.2)]`}
+                      style={{ width: `${visualCompletion}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>

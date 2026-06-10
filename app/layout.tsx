@@ -1,17 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { PrimaryNav } from "@/components/PrimaryNav";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: "1st Edition Tracker",
   description: "Local-first tracker for English 1st Edition vintage Pokemon cards.",
 };
-
-const navItems = [
-  { href: "/", label: "Dashboard" },
-  { href: "/sets", label: "Sets" },
-  { href: "/cards", label: "Cards" },
-];
 
 export default function RootLayout({
   children,
@@ -29,22 +24,12 @@ export default function RootLayout({
               </span>
               <span>
                 <span className="block text-base font-black tracking-wide text-white">
-                  Vintage Pokemon
+                  Vintage Pokémon
                 </span>
-                <span className="block text-sm text-slate-400">1st Edition collection platform</span>
+                <span className="block text-sm text-slate-400">1st Edition Collection Platform</span>
               </span>
             </Link>
-            <nav className="flex gap-2">
-              {navItems.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className="rounded-md px-3 py-2 text-sm font-semibold text-slate-300 transition hover:bg-cyan-300/10 hover:text-cyan-100 hover:shadow-glow"
-                >
-                  {item.label}
-                </Link>
-              ))}
-            </nav>
+            <PrimaryNav />
           </div>
         </header>
         <main className="relative z-10 mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">{children}</main>

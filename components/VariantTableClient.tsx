@@ -55,8 +55,22 @@ const rarityTone: Record<string, string> = {
   "Rare Shining": "border-pink-300/40 bg-pink-400/15 text-pink-100 shadow-magenta",
 };
 
+const rarityEdge: Record<string, string> = {
+  "Rare Holo": "from-fuchsia-300 via-pink-400 to-amber-300",
+  Rare: "from-cyan-300 via-sky-400 to-blue-400",
+  Uncommon: "from-sky-300 via-blue-400 to-indigo-400",
+  Common: "from-slate-300 via-slate-400 to-slate-600",
+  Energy: "from-amber-300 via-orange-400 to-rose-400",
+  "Rare Secret": "from-amber-200 via-fuchsia-300 to-cyan-300",
+  "Rare Shining": "from-pink-300 via-fuchsia-300 to-cyan-300",
+};
+
 function rarityClass(rarity: string) {
   return rarityTone[rarity] ?? "border-cyan-300/15 bg-white/10 text-slate-200";
+}
+
+function rarityEdgeClass(rarity: string) {
+  return rarityEdge[rarity] ?? "from-cyan-300 via-fuchsia-300 to-amber-300";
 }
 
 function cardNumberValue(cardNumber: string) {
@@ -232,114 +246,111 @@ export function VariantTableClient({
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-b-lg">
-        <table className="min-w-[1180px] divide-y divide-cyan-300/10 text-left text-sm">
-          <thead className="bg-cyan-300/[0.05] text-xs font-black uppercase tracking-wide text-slate-400">
-            <tr>
-              {showSet ? <th className="px-4 py-3">Set</th> : null}
-              <th className="px-4 py-3">No.</th>
-              <th className="px-4 py-3">Card</th>
-              <th className="px-4 py-3">Variant</th>
-              <th className="px-4 py-3">Owned</th>
-              <th className="px-4 py-3">Condition</th>
-              <th className="px-4 py-3">Grading</th>
-              <th className="px-4 py-3 text-right">Value</th>
-              <th className="px-4 py-3 text-right">Paid</th>
-              <th className="px-4 py-3">Notes</th>
-              <th className="sticky right-0 bg-slate-950/95 px-4 py-3 text-right shadow-[-16px_0_24px_rgba(2,6,23,0.7)]">
-                Action
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-cyan-300/10">
-            {filteredVariants.map((variant) => {
-              const owned = hasOwnedCopy(variant);
-              const primaryCopy = getPrimaryCopy(variant);
+      <div className="collection-grid grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3">
+        {filteredVariants.map((variant) => {
+          const owned = hasOwnedCopy(variant);
+          const primaryCopy = getPrimaryCopy(variant);
+          const notes = primaryCopy?.notes || variant.notes;
 
-              return (
-                <tr key={variant.id} className="align-top transition hover:bg-cyan-300/[0.055] hover:shadow-[inset_3px_0_0_rgba(34,211,238,0.65)]">
-                  {showSet ? (
-                    <td className="whitespace-nowrap px-4 py-4">
-                      <span className="inline-flex items-center gap-2 font-bold text-white">
-                        <span
-                          className="grid size-7 place-items-center rounded-md text-[10px] font-black text-slate-950 ring-1 ring-white/20"
-                          style={{ backgroundColor: variant.card.set.color }}
-                        >
-                          {variant.card.set.symbol}
-                        </span>
-                        {variant.card.set.name}
-                      </span>
-                    </td>
-                  ) : null}
-                  <td className="whitespace-nowrap px-4 py-4 font-mono text-slate-300">
-                    {variant.card.cardNumber}
-                  </td>
-                  <td className="px-4 py-4">
-                    <div className="font-black text-white">{variant.card.name}</div>
-                    <span
-                      className={`mt-2 inline-flex rounded-md border px-2 py-1 text-xs font-black ${rarityClass(variant.card.rarity)}`}
-                    >
-                      {variant.card.rarity}
-                    </span>
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-4 text-slate-300">
-                    <div>{formatEnumLabel(variant.edition)}</div>
-                    <div className="mt-1 text-xs text-slate-500">{formatEnumLabel(variant.finish)}</div>
-                  </td>
-                  <td className="px-4 py-4">
-                    <span
-                      className={`inline-flex rounded-md border px-2 py-1 text-xs font-black ${
-                        owned
-                          ? "border-cyan-300/[0.35] bg-cyan-400/15 text-cyan-100 shadow-glow"
-                          : "border-fuchsia-300/30 bg-fuchsia-400/[0.12] text-fuchsia-200"
-                      }`}
-                    >
-                      {owned ? "Owned" : "Missing"}
-                    </span>
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-4 text-slate-300">
-                    {formatEnumLabel(primaryCopy?.condition)}
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-4 text-slate-300">
+          return (
+            <article
+              key={variant.id}
+              className={`collection-card group relative flex min-h-72 flex-col overflow-hidden rounded-lg border p-4 ${
+                owned
+                  ? "is-owned border-cyan-300/25 bg-cyan-300/[0.055]"
+                  : "is-missing border-white/[0.08] bg-slate-950/[0.48]"
+              }`}
+            >
+              <div className={`absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r ${rarityEdgeClass(variant.card.rarity)} ${owned ? "opacity-90" : "opacity-40"}`} />
+
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-3">
+                  <span
+                    className={`grid size-10 shrink-0 place-items-center rounded-md text-xs font-black text-slate-950 ring-1 ring-white/25 ${owned ? "shadow-glow" : "opacity-70"}`}
+                    style={{ backgroundColor: variant.card.set.color }}
+                    title={variant.card.set.name}
+                  >
+                    {variant.card.set.symbol}
+                  </span>
+                  <div className="min-w-0">
+                    {showSet ? <p className="truncate text-xs font-bold text-slate-500">{variant.card.set.name}</p> : null}
+                    <p className="font-mono text-xs font-bold text-cyan-100/70">#{variant.card.cardNumber}</p>
+                  </div>
+                </div>
+                <span
+                  className={`inline-flex shrink-0 rounded-md border px-2 py-1 text-xs font-black ${
+                    owned
+                      ? "border-emerald-300/35 bg-emerald-400/15 text-emerald-100 shadow-[0_0_18px_rgba(52,211,153,0.12)]"
+                      : "border-slate-400/20 bg-slate-400/[0.08] text-slate-400"
+                  }`}
+                >
+                  {owned ? "Owned" : "Missing"}
+                </span>
+              </div>
+
+              <div className="mt-4">
+                <h3 className={`text-xl font-black leading-tight ${owned ? "text-white" : "text-slate-200"}`}>{variant.card.name}</h3>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <span className={`inline-flex rounded-md border px-2 py-1 text-xs font-black ${rarityClass(variant.card.rarity)}`}>
+                    {variant.card.rarity}
+                  </span>
+                  <span className="inline-flex rounded-md border border-white/[0.08] bg-white/[0.035] px-2 py-1 text-xs font-bold text-slate-400">
+                    {formatEnumLabel(variant.finish)}
+                  </span>
+                </div>
+              </div>
+
+              <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 border-y border-white/[0.07] py-3 text-sm">
+                <div>
+                  <dt className="text-[10px] font-black uppercase tracking-wide text-slate-600">Condition</dt>
+                  <dd className="mt-1 font-semibold text-slate-300">{formatEnumLabel(primaryCopy?.condition)}</dd>
+                </div>
+                <div>
+                  <dt className="text-[10px] font-black uppercase tracking-wide text-slate-600">Grading</dt>
+                  <dd className="mt-1 font-semibold text-slate-300">
                     {primaryCopy
                       ? `${formatEnumLabel(primaryCopy.gradingCompany)}${primaryCopy.grade ? ` ${primaryCopy.grade}` : ""}`
                       : "-"}
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-4 text-right font-bold text-white">
-                    {formatCurrency(variant.estimatedValue)}
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-4 text-right text-slate-300">
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-[10px] font-black uppercase tracking-wide text-slate-600">Value</dt>
+                  <dd className="mt-1 font-black text-white">{formatCurrency(variant.estimatedValue)}</dd>
+                </div>
+                <div>
+                  <dt className="text-[10px] font-black uppercase tracking-wide text-slate-600">Paid</dt>
+                  <dd className="mt-1 font-semibold text-slate-300">
                     {primaryCopy?.purchasePrice ? formatCurrency(primaryCopy.purchasePrice) : "-"}
-                  </td>
-                  <td className="min-w-56 max-w-sm px-4 py-4 text-slate-400">
-                    <span className="line-clamp-3">{primaryCopy?.notes || variant.notes || "-"}</span>
-                  </td>
-                  <td className="sticky right-0 bg-slate-950/95 px-4 py-4 text-right shadow-[-16px_0_24px_rgba(2,6,23,0.7)]">
-                    <div className="flex justify-end gap-2">
-                      <Link
-                        href={`/cards/${variant.id}`}
-                        className="btn-secondary whitespace-nowrap rounded-md px-3 py-2 text-xs font-black transition"
-                      >
-                        Details
-                      </Link>
-                      <form action={toggleOwnedAction}>
-                        <input type="hidden" name="variantId" value={variant.id} />
-                        <input type="hidden" name="setSlug" value={variant.card.set.slug} />
-                        <input type="hidden" name="owned" value={String(!owned)} />
-                        <button
-                          type="submit"
-                          className="btn-primary whitespace-nowrap rounded-md px-3 py-2 text-xs font-black transition"
-                        >
-                          {owned ? "Mark missing" : "Mark owned"}
-                        </button>
-                      </form>
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                  </dd>
+                </div>
+              </dl>
+
+              <p className="mt-3 line-clamp-2 min-h-10 text-sm leading-relaxed text-slate-500">
+                {notes || (owned ? "No collector notes yet." : "Not yet added to the collection.")}
+              </p>
+
+              <div className="mt-auto flex items-center gap-2 pt-4">
+                <Link
+                  href={`/cards/${variant.id}`}
+                  className="btn-secondary flex-1 whitespace-nowrap rounded-md px-3 py-2 text-center text-xs font-black transition"
+                >
+                  View details
+                </Link>
+                <form action={toggleOwnedAction} className="flex-1">
+                  <input type="hidden" name="variantId" value={variant.id} />
+                  <input type="hidden" name="setSlug" value={variant.card.set.slug} />
+                  <input type="hidden" name="owned" value={String(!owned)} />
+                  <button
+                    type="submit"
+                    className={`w-full whitespace-nowrap rounded-md px-3 py-2 text-xs font-black transition ${owned ? "btn-secondary" : "btn-primary"}`}
+                  >
+                    {owned ? "Mark missing" : "Mark owned"}
+                  </button>
+                </form>
+              </div>
+            </article>
+          );
+        })}
       </div>
       {filteredVariants.length === 0 ? (
         <div className="p-8 text-center text-sm font-semibold text-slate-400">
