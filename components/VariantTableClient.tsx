@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { CardArtwork } from "@/components/CardArtwork";
 import { formatCurrency } from "@/lib/format";
 
 type OwnedItemRow = {
@@ -26,6 +27,10 @@ type VariantRow = {
     cardNumber: string;
     name: string;
     rarity: string;
+    imageUrlSmall: string | null;
+    imageUrlLarge: string | null;
+    imageSource: string | null;
+    imageMatchStatus: string;
     set: {
       name: string;
       slug: string;
@@ -255,7 +260,7 @@ export function VariantTableClient({
           return (
             <article
               key={variant.id}
-              className={`collection-card group relative flex min-h-72 flex-col overflow-hidden rounded-lg border p-4 ${
+              className={`collection-card group relative flex min-h-[25rem] flex-col overflow-hidden rounded-lg border p-4 ${
                 owned
                   ? "is-owned border-cyan-300/25 bg-cyan-300/[0.055]"
                   : "is-missing border-white/[0.08] bg-slate-950/[0.48]"
@@ -264,18 +269,9 @@ export function VariantTableClient({
               <div className={`absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r ${rarityEdgeClass(variant.card.rarity)} ${owned ? "opacity-90" : "opacity-40"}`} />
 
               <div className="flex items-start justify-between gap-3">
-                <div className="flex min-w-0 items-center gap-3">
-                  <span
-                    className={`grid size-10 shrink-0 place-items-center rounded-md text-xs font-black text-slate-950 ring-1 ring-white/25 ${owned ? "shadow-glow" : "opacity-70"}`}
-                    style={{ backgroundColor: variant.card.set.color }}
-                    title={variant.card.set.name}
-                  >
-                    {variant.card.set.symbol}
-                  </span>
-                  <div className="min-w-0">
-                    {showSet ? <p className="truncate text-xs font-bold text-slate-500">{variant.card.set.name}</p> : null}
-                    <p className="font-mono text-xs font-bold text-cyan-100/70">#{variant.card.cardNumber}</p>
-                  </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-600">Archive record</p>
+                  <p className="mt-1 truncate text-xs font-bold text-slate-400">{variant.card.set.name}</p>
                 </div>
                 <span
                   className={`inline-flex shrink-0 rounded-md border px-2 py-1 text-xs font-black ${
@@ -288,19 +284,36 @@ export function VariantTableClient({
                 </span>
               </div>
 
-              <div className="mt-4">
-                <h3 className={`text-xl font-black leading-tight ${owned ? "text-white" : "text-slate-200"}`}>{variant.card.name}</h3>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <span className={`inline-flex rounded-md border px-2 py-1 text-xs font-black ${rarityClass(variant.card.rarity)}`}>
-                    {variant.card.rarity}
-                  </span>
-                  <span className="inline-flex rounded-md border border-white/[0.08] bg-white/[0.035] px-2 py-1 text-xs font-bold text-slate-400">
-                    {formatEnumLabel(variant.finish)}
-                  </span>
+              <div className="mt-4 grid grid-cols-[7.25rem_1fr] gap-4">
+                <CardArtwork
+                  name={variant.card.name}
+                  cardNumber={variant.card.cardNumber}
+                  setName={variant.card.set.name}
+                  setSymbol={variant.card.set.symbol}
+                  setColor={variant.card.set.color}
+                  imageUrlSmall={variant.card.imageUrlSmall}
+                  imageUrlLarge={variant.card.imageUrlLarge}
+                  imageSource={variant.card.imageSource}
+                  imageMatchStatus={variant.card.imageMatchStatus}
+                  owned={owned}
+                />
+
+                <div className="flex min-w-0 flex-col py-1">
+                  <p className="font-mono text-xs font-bold text-cyan-100/65">#{variant.card.cardNumber}</p>
+                  <h3 className={`mt-2 text-xl font-black leading-tight ${owned ? "text-white" : "text-slate-200"}`}>{variant.card.name}</h3>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <span className={`inline-flex rounded-md border px-2 py-1 text-xs font-black ${rarityClass(variant.card.rarity)}`}>
+                      {variant.card.rarity}
+                    </span>
+                    <span className="inline-flex rounded-md border border-white/[0.08] bg-white/[0.035] px-2 py-1 text-xs font-bold text-slate-400">
+                      {formatEnumLabel(variant.finish)}
+                    </span>
+                  </div>
+                  <p className="mt-auto pt-3 text-xs font-semibold text-slate-500">{formatEnumLabel(variant.edition)}</p>
                 </div>
               </div>
 
-              <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 border-y border-white/[0.07] py-3 text-sm">
+              <dl className="mt-4 grid grid-cols-4 gap-3 border-y border-white/[0.07] py-3 text-sm">
                 <div>
                   <dt className="text-[10px] font-black uppercase tracking-wide text-slate-600">Condition</dt>
                   <dd className="mt-1 font-semibold text-slate-300">{formatEnumLabel(primaryCopy?.condition)}</dd>
@@ -332,7 +345,7 @@ export function VariantTableClient({
               <div className="mt-auto flex items-center gap-2 pt-4">
                 <Link
                   href={`/cards/${variant.id}`}
-                  className="btn-secondary flex-1 whitespace-nowrap rounded-md px-3 py-2 text-center text-xs font-black transition"
+                  className={`${owned ? "btn-primary" : "btn-secondary"} flex-1 whitespace-nowrap rounded-md px-3 py-2 text-center text-xs font-black transition`}
                 >
                   View details
                 </Link>

@@ -40,6 +40,10 @@ model Card {
   category    String        @default("POKEMON")
   displayOrder Int
   artist      String?
+  imageUrlSmall String?
+  imageUrlLarge String?
+  imageSource String?
+  imageMatchStatus String @default("UNMATCHED")
   variants    CardVariant[]
 
   createdAt DateTime @default(now())
@@ -48,6 +52,7 @@ model Card {
   @@unique([setId, cardNumber, name])
   @@index([setId])
   @@index([setId, displayOrder])
+  @@index([imageMatchStatus])
 }
 
 model CardVariant {

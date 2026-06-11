@@ -2,6 +2,7 @@ import Link from "next/link";
 import { unstable_noStore as noStore } from "next/cache";
 import { notFound } from "next/navigation";
 import { updateVariantDetails } from "@/app/actions";
+import { CardArtwork } from "@/components/CardArtwork";
 import { StatCard } from "@/components/StatCard";
 import { CARD_CONDITION } from "@/lib/domain";
 import { formatEnumLabel, getPrimaryCopy, hasOwnedCopy } from "@/lib/collection";
@@ -110,6 +111,21 @@ export default async function CardDetailPage({ params, searchParams }: CardDetai
 
       <section className="grid gap-6 lg:grid-cols-[0.75fr_1.25fr]">
         <div className="neon-panel rounded-lg p-5">
+          <CardArtwork
+            name={variant.card.name}
+            cardNumber={variant.card.cardNumber}
+            setName={variant.card.set.name}
+            setSymbol={variant.card.set.symbol}
+            setColor={variant.card.set.color}
+            imageUrlSmall={variant.card.imageUrlSmall}
+            imageUrlLarge={variant.card.imageUrlLarge}
+            imageSource={variant.card.imageSource}
+            imageMatchStatus={variant.card.imageMatchStatus}
+            owned={owned}
+            preferLarge
+            priority
+            className="mx-auto mb-5 w-full max-w-56"
+          />
           <p className="neon-eyebrow text-xs font-black uppercase tracking-widest">Source identity</p>
           <h2 className="text-lg font-black text-white">Imported card identity</h2>
           <dl className="mt-4 space-y-4 text-sm">
