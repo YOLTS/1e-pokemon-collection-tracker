@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { CardArtwork } from "@/components/CardArtwork";
 import { formatCurrency } from "@/lib/format";
+import { compareRarity, rarityToken } from "@/lib/rarity";
 
 type OwnedItemRow = {
   id: number;
@@ -50,34 +51,6 @@ type VariantTableClientProps = {
 type OwnedFilter = "all" | "owned" | "missing";
 type SortKey = "checklist" | "name" | "rarity" | "owned" | "value";
 
-const rarityTone: Record<string, string> = {
-  "Rare Holo": "border-fuchsia-300/[0.35] bg-fuchsia-400/15 text-fuchsia-100 shadow-magenta",
-  Rare: "border-cyan-300/[0.35] bg-cyan-400/15 text-cyan-100 shadow-glow",
-  Uncommon: "border-sky-300/30 bg-sky-400/[0.12] text-sky-100",
-  Common: "border-slate-300/20 bg-slate-300/10 text-slate-300",
-  Energy: "border-amber-300/[0.35] bg-amber-400/15 text-amber-100 shadow-amber",
-  "Rare Secret": "border-amber-300/40 bg-gradient-to-r from-amber-300/20 to-fuchsia-400/15 text-amber-100 shadow-amber",
-  "Rare Shining": "border-pink-300/40 bg-pink-400/15 text-pink-100 shadow-magenta",
-};
-
-const rarityEdge: Record<string, string> = {
-  "Rare Holo": "from-fuchsia-300 via-pink-400 to-amber-300",
-  Rare: "from-cyan-300 via-sky-400 to-blue-400",
-  Uncommon: "from-sky-300 via-blue-400 to-indigo-400",
-  Common: "from-slate-300 via-slate-400 to-slate-600",
-  Energy: "from-amber-300 via-orange-400 to-rose-400",
-  "Rare Secret": "from-amber-200 via-fuchsia-300 to-cyan-300",
-  "Rare Shining": "from-pink-300 via-fuchsia-300 to-cyan-300",
-};
-
-function rarityClass(rarity: string) {
-  return rarityTone[rarity] ?? "border-cyan-300/15 bg-white/10 text-slate-200";
-}
-
-function rarityEdgeClass(rarity: string) {
-  return rarityEdge[rarity] ?? "from-cyan-300 via-fuchsia-300 to-amber-300";
-}
-
 function cardNumberValue(cardNumber: string) {
   const [number] = cardNumber.split("/");
   return Number(number) || 0;
@@ -118,7 +91,7 @@ export function VariantTableClient({
   const [sortKey, setSortKey] = useState<SortKey>("checklist");
 
   const rarityOptions = useMemo(
-    () => Array.from(new Set(variants.map((variant) => variant.card.rarity))).sort(),
+    () => Array.from(new Set(variants.map((variant) => variant.card.rarity))).sort(compareRarity),
     [variants],
   );
 
@@ -159,7 +132,7 @@ export function VariantTableClient({
 
         if (sortKey === "rarity") {
           return (
-            a.card.rarity.localeCompare(b.card.rarity) ||
+            compareRarity(a.card.rarity, b.card.rarity) ||
             cardNumberValue(a.card.cardNumber) - cardNumberValue(b.card.cardNumber)
           );
         }
@@ -266,7 +239,7 @@ export function VariantTableClient({
                   : "is-missing border-white/[0.08] bg-slate-950/[0.48]"
               }`}
             >
-              <div className={`absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r ${rarityEdgeClass(variant.card.rarity)} ${owned ? "opacity-90" : "opacity-40"}`} />
+              <div className={`rarity-edge rarity-${rarityToken(variant.card.rarity)} ${owned ? "is-owned" : "is-missing"}`} />
 
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -274,12 +247,9 @@ export function VariantTableClient({
                   <p className="mt-1 truncate text-xs font-bold text-slate-400">{variant.card.set.name}</p>
                 </div>
                 <span
-                  className={`inline-flex shrink-0 rounded-md border px-2 py-1 text-xs font-black ${
-                    owned
-                      ? "border-emerald-300/35 bg-emerald-400/15 text-emerald-100 shadow-[0_0_18px_rgba(52,211,153,0.12)]"
-                      : "border-slate-400/20 bg-slate-400/[0.08] text-slate-400"
-                  }`}
+                  className={`ownership-badge ${owned ? "is-owned" : "is-missing"}`}
                 >
+                  <span className="ownership-badge-dot" aria-hidden="true" />
                   {owned ? "Owned" : "Missing"}
                 </span>
               </div>
@@ -302,7 +272,7 @@ export function VariantTableClient({
                   <p className="font-mono text-xs font-bold text-cyan-100/65">#{variant.card.cardNumber}</p>
                   <h3 className={`mt-2 text-xl font-black leading-tight ${owned ? "text-white" : "text-slate-200"}`}>{variant.card.name}</h3>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <span className={`inline-flex rounded-md border px-2 py-1 text-xs font-black ${rarityClass(variant.card.rarity)}`}>
+                    <span className={`rarity-badge rarity-${rarityToken(variant.card.rarity)}`}>
                       {variant.card.rarity}
                     </span>
                     <span className="inline-flex rounded-md border border-white/[0.08] bg-white/[0.035] px-2 py-1 text-xs font-bold text-slate-400">

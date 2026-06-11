@@ -7,6 +7,7 @@ import { VariantTable } from "@/components/VariantTable";
 import { summarizeVariants } from "@/lib/collection";
 import { formatCurrency } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
+import { compareRarity, rarityToken } from "@/lib/rarity";
 
 export const dynamic = "force-dynamic";
 
@@ -56,15 +57,7 @@ export default async function SetDetailPage({ params }: SetDetailPageProps) {
       map.set(variant.card.rarity, current);
       return map;
     }, new Map<string, { total: number; owned: number }>()),
-  );
-
-  const rarityTone: Record<string, string> = {
-    "Rare Holo": "from-fuchsia-300 to-pink-400 text-fuchsia-100",
-    Rare: "from-cyan-300 to-sky-400 text-cyan-100",
-    Uncommon: "from-sky-300 to-blue-400 text-sky-100",
-    Common: "from-slate-300 to-slate-500 text-slate-200",
-    Energy: "from-amber-300 to-orange-400 text-amber-100",
-  };
+  ).sort(([a], [b]) => compareRarity(a, b));
 
   return (
     <div className="space-y-6">
@@ -115,17 +108,17 @@ export default async function SetDetailPage({ params }: SetDetailPageProps) {
             {rarityBreakdown.map(([rarity, counts]) => {
               const completion = counts.total ? (counts.owned / counts.total) * 100 : 0;
               const visualCompletion = completion > 0 ? Math.max(4, completion) : 0;
-              const tone = rarityTone[rarity] ?? "from-cyan-300 to-fuchsia-300 text-cyan-100";
+              const rarityClass = `rarity-${rarityToken(rarity)}`;
 
               return (
-                <div key={rarity} className="rarity-progress-card rounded-lg border border-white/[0.08] bg-slate-950/[0.48] p-3">
+                <div key={rarity} className={`rarity-progress-card ${rarityClass} rounded-lg p-3`}>
                   <div className="flex items-baseline justify-between gap-3">
-                    <span className={`text-xs font-black ${tone.split(" ").at(-1)}`}>{rarity}</span>
+                    <span className="rarity-progress-label text-xs font-black">{rarity}</span>
                     <span className="text-sm font-black text-white">{counts.owned}/{counts.total}</span>
                   </div>
                   <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-950 ring-1 ring-white/[0.08]">
                     <div
-                      className={`h-full rounded-full bg-gradient-to-r ${tone.replace(/text-\S+/, "")} shadow-[0_0_12px_rgba(34,211,238,0.2)]`}
+                      className="rarity-progress-fill h-full rounded-full"
                       style={{ width: `${visualCompletion}%` }}
                     />
                   </div>

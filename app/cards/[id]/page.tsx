@@ -3,10 +3,10 @@ import { unstable_noStore as noStore } from "next/cache";
 import { notFound } from "next/navigation";
 import { updateVariantDetails } from "@/app/actions";
 import { CardArtwork } from "@/components/CardArtwork";
-import { StatCard } from "@/components/StatCard";
 import { CARD_CONDITION } from "@/lib/domain";
 import { formatEnumLabel, getPrimaryCopy, hasOwnedCopy } from "@/lib/collection";
 import { formatCurrency } from "@/lib/format";
+import { rarityToken } from "@/lib/rarity";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -57,40 +57,20 @@ export default async function CardDetailPage({ params, searchParams }: CardDetai
   const owned = hasOwnedCopy(variant);
   const primaryCopy = getPrimaryCopy(variant);
   const editableNotes = primaryCopy?.notes || variant.notes;
+  const gradingLabel = primaryCopy
+    ? `${formatEnumLabel(primaryCopy.gradingCompany)}${primaryCopy.grade ? ` ${primaryCopy.grade}` : ""}`
+    : "Not graded";
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <Link href={`/sets/${variant.card.set.slug}`} className="text-sm font-bold text-cyan-300 hover:text-white">
-            Back to {variant.card.set.name}
-          </Link>
-          <div className="mt-4 flex items-center gap-4">
-            <div
-              className="grid size-14 place-items-center rounded-lg text-base font-black text-slate-950 shadow-glow ring-1 ring-white/20"
-              style={{ backgroundColor: variant.card.set.color }}
-            >
-              {variant.card.set.symbol}
-            </div>
-            <div>
-              <p className="text-sm font-bold uppercase tracking-widest text-slate-500">
-                {variant.card.set.name} - {variant.card.cardNumber}
-              </p>
-              <h1 className="mt-1 text-4xl font-black text-white">{variant.card.name}</h1>
-              <p className="mt-2 text-slate-400">
-                {formatEnumLabel(variant.edition)} - {formatEnumLabel(variant.finish)} - {variant.card.rarity}
-              </p>
-              <div className="neon-divider mt-4 max-w-md" />
-            </div>
-          </div>
-        </div>
-        <Link
-          href="/cards"
-          className="btn-secondary inline-flex items-center justify-center rounded-md px-4 py-3 text-sm font-black transition"
-        >
+    <div className="card-detail-page space-y-6">
+      <nav className="flex flex-wrap items-center justify-between gap-3" aria-label="Card navigation">
+        <Link href={`/sets/${variant.card.set.slug}`} className="text-sm font-bold text-cyan-300 transition hover:text-white">
+          Back to {variant.card.set.name}
+        </Link>
+        <Link href="/cards" className="btn-secondary inline-flex items-center justify-center rounded-md px-4 py-2.5 text-sm font-black transition">
           All cards
         </Link>
-      </div>
+      </nav>
 
       {searchParams.saved ? (
         <div className="rounded-lg border border-cyan-300/20 bg-cyan-400/10 px-4 py-3 text-sm font-bold text-cyan-100 shadow-glow">
@@ -98,19 +78,12 @@ export default async function CardDetailPage({ params, searchParams }: CardDetai
         </div>
       ) : null}
 
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Owned status" value={owned ? "Owned" : "Missing"} tone={owned ? "green" : "rose"} />
-        <StatCard label="Condition" value={formatEnumLabel(primaryCopy?.condition)} />
-        <StatCard label="Estimated value" value={formatCurrency(variant.estimatedValue)} tone="cyan" />
-        <StatCard
-          label="Purchase price"
-          value={primaryCopy?.purchasePrice ? formatCurrency(primaryCopy.purchasePrice) : "-"}
-          tone="amber"
-        />
-      </section>
-
-      <section className="grid gap-6 lg:grid-cols-[0.75fr_1.25fr]">
-        <div className="neon-panel rounded-lg p-5">
+      <section className={`card-detail-showcase neon-panel overflow-hidden rounded-lg ${owned ? "is-owned" : "is-missing"}`}>
+        <div className="card-detail-artwork-stage">
+          <div className="card-detail-catalog-mark">
+            <span>{variant.card.set.releaseYear}</span>
+            <span>{variant.card.set.symbol}</span>
+          </div>
           <CardArtwork
             name={variant.card.name}
             cardNumber={variant.card.cardNumber}
@@ -124,41 +97,62 @@ export default async function CardDetailPage({ params, searchParams }: CardDetai
             owned={owned}
             preferLarge
             priority
-            className="mx-auto mb-5 w-full max-w-56"
+            className="card-detail-artwork mx-auto w-full max-w-sm"
           />
-          <p className="neon-eyebrow text-xs font-black uppercase tracking-widest">Source identity</p>
-          <h2 className="text-lg font-black text-white">Imported card identity</h2>
-          <dl className="mt-4 space-y-4 text-sm">
-            <div>
-              <dt className="font-bold text-slate-500">Set</dt>
-              <dd className="mt-1 text-white">{variant.card.set.name}</dd>
-            </div>
-            <div>
-              <dt className="font-bold text-slate-500">Card number</dt>
-              <dd className="mt-1 font-mono text-white">{variant.card.cardNumber}</dd>
-            </div>
-            <div>
-              <dt className="font-bold text-slate-500">Rarity</dt>
-              <dd className="mt-1 text-white">{variant.card.rarity}</dd>
-            </div>
-            <div>
-              <dt className="font-bold text-slate-500">Edition</dt>
-              <dd className="mt-1 text-white">{formatEnumLabel(variant.edition)}</dd>
-            </div>
-          </dl>
+          <p className="mt-5 text-center text-xs font-semibold uppercase tracking-widest text-slate-500">
+            Select artwork for full archival view
+          </p>
         </div>
 
-        <form action={updateVariantDetails} className="neon-panel rounded-lg p-5">
+        <div className="card-detail-record">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="min-w-0">
+              <p className="neon-eyebrow text-xs font-black uppercase tracking-widest">Collector archive record</p>
+              <p className="mt-2 text-sm font-bold uppercase tracking-widest text-slate-500">
+                {variant.card.set.name} / No. {variant.card.cardNumber}
+              </p>
+              <h1 className="mt-2 text-4xl font-black leading-none text-white sm:text-5xl">{variant.card.name}</h1>
+              <p className="mt-4 max-w-xl text-base font-semibold text-slate-400">
+                {formatEnumLabel(variant.edition)} edition · {formatEnumLabel(variant.finish)} · English vintage archive
+              </p>
+            </div>
+            <span className={`ownership-badge ${owned ? "is-owned" : "is-missing"}`}>
+              <span className="ownership-badge-dot" aria-hidden="true" />
+              {owned ? "In collection" : "Missing"}
+            </span>
+          </div>
+
+          <div className="mt-7 flex flex-wrap items-center gap-3 border-y border-white/[0.08] py-4">
+            <span className={`rarity-badge rarity-${rarityToken(variant.card.rarity)}`}>{variant.card.rarity}</span>
+            <span className="card-detail-token">{formatEnumLabel(variant.finish)}</span>
+            <span className="card-detail-token">{formatEnumLabel(variant.edition)}</span>
+          </div>
+
+          <dl className="card-detail-metrics mt-7 grid gap-px overflow-hidden rounded-lg sm:grid-cols-2">
+            <div><dt>Condition</dt><dd>{formatEnumLabel(primaryCopy?.condition)}</dd></div>
+            <div><dt>Grading</dt><dd>{gradingLabel}</dd></div>
+            <div><dt>Estimated value</dt><dd>{formatCurrency(variant.estimatedValue)}</dd></div>
+            <div><dt>Acquisition cost</dt><dd>{primaryCopy?.purchasePrice ? formatCurrency(primaryCopy.purchasePrice) : "Not recorded"}</dd></div>
+          </dl>
+
+          <div className="card-detail-provenance mt-7">
+            <p className="text-xs font-black uppercase tracking-widest text-slate-500">Collection notes</p>
+            <p className="mt-3 text-sm leading-7 text-slate-300">
+              {editableNotes || (owned ? "No collector notes have been recorded for this copy." : "This card has not yet been added to the collection.")}
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <form action={updateVariantDetails} className="card-detail-ledger neon-panel rounded-lg p-5 sm:p-6">
           <input type="hidden" name="variantId" value={variant.id} />
           <input type="hidden" name="setSlug" value={variant.card.set.slug} />
 
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex flex-col gap-4 border-b border-white/[0.08] pb-5 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <p className="neon-eyebrow text-xs font-black uppercase tracking-widest">Collection edit bay</p>
-              <h2 className="text-lg font-black text-white">Collector details</h2>
-              <p className="mt-1 text-sm text-slate-400">
-                Update mutable collection fields without changing spreadsheet-imported card identity.
-              </p>
+              <p className="neon-eyebrow text-xs font-black uppercase tracking-widest">Private collection ledger</p>
+              <h2 className="mt-1 text-2xl font-black text-white">Condition, value and provenance</h2>
+              <p className="mt-2 text-sm text-slate-400">Maintain the mutable record for this collectible without altering its imported identity.</p>
             </div>
             <button
               type="submit"
@@ -168,7 +162,8 @@ export default async function CardDetailPage({ params, searchParams }: CardDetai
             </button>
           </div>
 
-          <div className="mt-6 grid gap-4 sm:grid-cols-2">
+          <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_0.9fr]">
+            <div className="grid content-start gap-4 sm:grid-cols-2">
             <label className="block">
               <span className="text-xs font-bold uppercase tracking-wide text-slate-500">Condition</span>
               <select
@@ -214,20 +209,20 @@ export default async function CardDetailPage({ params, searchParams }: CardDetai
                 {owned ? "Owned" : "Missing"}
               </div>
             </label>
-          </div>
+            </div>
 
-          <label className="mt-4 block">
-            <span className="text-xs font-bold uppercase tracking-wide text-slate-500">Notes</span>
-            <textarea
-              name="notes"
-              rows={6}
-              defaultValue={editableNotes}
-              className="field-control mt-1 w-full rounded-md px-3 py-3 text-sm text-white outline-none transition placeholder:text-slate-600"
-              placeholder="Condition details, acquisition context, binder notes"
-            />
-          </label>
-        </form>
-      </section>
+            <label className="block">
+              <span className="text-xs font-bold uppercase tracking-wide text-slate-500">Collector notes and provenance</span>
+              <textarea
+                name="notes"
+                rows={8}
+                defaultValue={editableNotes}
+                className="field-control mt-1 min-h-52 w-full rounded-md px-4 py-3 text-sm leading-6 text-white outline-none transition placeholder:text-slate-600"
+                placeholder="Condition details, acquisition context, binder notes"
+              />
+            </label>
+          </div>
+      </form>
     </div>
   );
 }

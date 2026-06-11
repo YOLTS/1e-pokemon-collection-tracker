@@ -136,7 +136,7 @@ export function CardArtwork({
       disabled={!imageUrlSmall && !imageUrlLarge}
       className={`card-artwork-trigger card-artwork-slot relative aspect-[5/7] overflow-hidden rounded-lg border text-left ${
         owned ? "border-cyan-300/25" : "border-white/[0.1]"
-      } ${hasImage ? "has-image" : "is-placeholder"} ${className}`}
+      } ${owned ? "is-owned-artwork" : "is-missing-artwork"} ${hasImage ? "has-image" : "is-placeholder"} ${className}`}
       aria-label={imageUrlSmall || imageUrlLarge ? `Open large preview of ${name}` : `${name} artwork unavailable`}
     >
       {imageUrl && state !== "error" ? (

@@ -531,14 +531,120 @@ textarea {
 }
 
 .rarity-progress-card {
+  --rarity-accent: 148 163 184;
+  --rarity-accent-2: 100 116 139;
+  border: 1px solid rgba(var(--rarity-accent), 0.16);
+  background:
+    linear-gradient(145deg, rgba(var(--rarity-accent), 0.055), transparent 52%),
+    rgba(2, 6, 23, 0.5);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
   transition: border-color 180ms ease, background-color 180ms ease, filter 180ms ease;
 }
 
 .rarity-progress-card:hover {
-  border-color: rgba(103, 232, 249, 0.2);
-  background-color: rgba(15, 23, 42, 0.66);
+  border-color: rgba(var(--rarity-accent), 0.3);
   filter: brightness(1.04);
+}
+
+.rarity-progress-label {
+  color: rgb(var(--rarity-accent));
+}
+
+.rarity-progress-fill {
+  background: linear-gradient(90deg, rgb(var(--rarity-accent)), rgb(var(--rarity-accent-2)));
+  box-shadow: 0 0 10px rgba(var(--rarity-accent), 0.18);
+}
+
+.rarity-badge {
+  --rarity-accent: 148 163 184;
+  --rarity-accent-2: 100 116 139;
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.625rem;
+  border: 1px solid rgba(var(--rarity-accent), 0.24);
+  border-radius: 5px;
+  padding: 0.25rem 0.5rem;
+  background:
+    linear-gradient(135deg, rgba(var(--rarity-accent), 0.13), rgba(var(--rarity-accent-2), 0.055)),
+    rgba(2, 6, 23, 0.62);
+  color: rgb(var(--rarity-accent));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.055);
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: 0.015em;
+}
+
+.rarity-edge {
+  --rarity-accent: 148 163 184;
+  --rarity-accent-2: 100 116 139;
+  position: absolute;
+  inset: 0 0 auto;
+  height: 2px;
+  background: linear-gradient(90deg, transparent 2%, rgb(var(--rarity-accent)), rgb(var(--rarity-accent-2)), transparent 98%);
+  opacity: 0.42;
+}
+
+.rarity-edge.is-owned {
+  opacity: 0.88;
+}
+
+.rarity-edge.is-missing {
+  opacity: 0.25;
+}
+
+.rarity-rare-secret,
+.rarity-rare-shining {
+  --rarity-accent: 253 224 71;
+  --rarity-accent-2: 232 121 249;
+}
+
+.rarity-rare-holo {
+  --rarity-accent: 240 171 252;
+  --rarity-accent-2: 251 191 36;
+}
+
+.rarity-holo {
+  --rarity-accent: 196 181 253;
+  --rarity-accent-2: 103 232 249;
+}
+
+.rarity-rare {
+  --rarity-accent: 125 211 252;
+  --rarity-accent-2: 96 165 250;
+}
+
+.rarity-uncommon {
+  --rarity-accent: 147 197 253;
+  --rarity-accent-2: 129 140 248;
+}
+
+.rarity-common {
+  --rarity-accent: 203 213 225;
+  --rarity-accent-2: 100 116 139;
+}
+
+.rarity-energy {
+  --rarity-accent: 180 153 104;
+  --rarity-accent-2: 120 113 108;
+}
+
+.rarity-badge.rarity-rare-holo,
+.rarity-badge.rarity-rare-secret,
+.rarity-badge.rarity-rare-shining {
+  border-color: rgba(var(--rarity-accent), 0.42);
+  background:
+    linear-gradient(135deg, rgba(var(--rarity-accent), 0.2), rgba(var(--rarity-accent-2), 0.1)),
+    rgba(2, 6, 23, 0.7);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 0 14px rgba(var(--rarity-accent), 0.07);
+}
+
+.rarity-badge.rarity-common,
+.rarity-badge.rarity-energy {
+  border-color: rgba(var(--rarity-accent), 0.17);
+  background: rgba(var(--rarity-accent), 0.055);
+  box-shadow: none;
 }
 
 .collection-card {
@@ -554,7 +660,12 @@ textarea {
 }
 
 .collection-card.is-missing {
-  filter: saturate(0.72) brightness(0.9);
+  border-color: rgba(148, 163, 184, 0.09);
+  background: rgba(2, 6, 23, 0.56);
+  box-shadow:
+    0 10px 26px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.025);
+  filter: saturate(0.56) brightness(0.8);
 }
 
 .collection-card:hover {
@@ -568,10 +679,85 @@ textarea {
 }
 
 .collection-card.is-owned {
+  transform: translateY(-1px);
+  border-color: rgba(103, 232, 249, 0.28);
+  background:
+    linear-gradient(145deg, rgba(34, 211, 238, 0.11), transparent 44%),
+    linear-gradient(320deg, rgba(52, 211, 153, 0.065), transparent 40%),
+    rgba(3, 10, 24, 0.88);
   box-shadow:
-    0 16px 38px rgba(0, 0, 0, 0.26),
-    0 0 22px rgba(34, 211, 238, 0.055),
-    inset 0 1px 0 rgba(255, 255, 255, 0.045);
+    0 18px 42px rgba(0, 0, 0, 0.3),
+    0 0 30px rgba(34, 211, 238, 0.105),
+    inset 0 1px 0 rgba(207, 250, 254, 0.13),
+    inset 2px 0 0 rgba(52, 211, 153, 0.46);
+}
+
+.collection-card.is-owned::after {
+  position: absolute;
+  inset: 3px;
+  z-index: 2;
+  border: 1px solid rgba(103, 232, 249, 0.07);
+  border-radius: 5px;
+  pointer-events: none;
+  content: "";
+}
+
+.collection-card.is-owned:hover {
+  border-color: rgba(103, 232, 249, 0.46);
+  box-shadow:
+    0 24px 52px rgba(0, 0, 0, 0.36),
+    0 0 34px rgba(34, 211, 238, 0.14),
+    inset 0 1px 0 rgba(207, 250, 254, 0.14),
+    inset 2px 0 0 rgba(52, 211, 153, 0.52);
+}
+
+.collection-card.is-missing:hover {
+  border-color: rgba(148, 163, 184, 0.2);
+  filter: saturate(0.7) brightness(0.88);
+}
+
+.ownership-badge {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px solid;
+  border-radius: 6px;
+  padding: 0.32rem 0.58rem;
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: 0.025em;
+  text-transform: uppercase;
+}
+
+.ownership-badge.is-owned {
+  border-color: rgba(110, 231, 183, 0.58);
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.27), rgba(34, 211, 238, 0.13));
+  color: #d1fae5;
+  box-shadow:
+    0 0 18px rgba(52, 211, 153, 0.14),
+    inset 0 1px 0 rgba(236, 253, 245, 0.12);
+}
+
+.ownership-badge.is-missing {
+  border-color: rgba(148, 163, 184, 0.13);
+  background: rgba(71, 85, 105, 0.06);
+  color: #7f8da1;
+}
+
+.ownership-badge-dot {
+  width: 0.38rem;
+  height: 0.38rem;
+  flex: none;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.65;
+}
+
+.ownership-badge.is-owned .ownership-badge-dot {
+  background: #6ee7b7;
+  box-shadow: 0 0 9px rgba(110, 231, 183, 0.85);
+  opacity: 1;
 }
 
 .card-artwork-slot {
@@ -612,6 +798,152 @@ textarea {
 
 .card-artwork-slot.has-image::after {
   opacity: 0.28;
+}
+
+.card-artwork-slot.is-owned-artwork {
+  border-color: rgba(103, 232, 249, 0.46);
+  box-shadow:
+    0 18px 34px rgba(0, 0, 0, 0.38),
+    0 0 24px rgba(34, 211, 238, 0.13),
+    inset 0 1px 0 rgba(207, 250, 254, 0.16);
+}
+
+.card-artwork-slot.is-owned-artwork img {
+  filter: saturate(1.14) contrast(1.055) brightness(1.055);
+}
+
+.card-artwork-slot.is-owned-artwork::after {
+  background:
+    linear-gradient(115deg, transparent 22%, rgba(255, 255, 255, 0.09) 42%, transparent 62%),
+    linear-gradient(180deg, rgba(103, 232, 249, 0.035), transparent 32%);
+  opacity: 0.5;
+}
+
+.card-artwork-slot.is-missing-artwork.has-image img {
+  filter: saturate(0.48) brightness(0.68) contrast(0.91);
+}
+
+.card-detail-showcase {
+  display: grid;
+  background:
+    linear-gradient(120deg, rgba(34, 211, 238, 0.055), transparent 38%),
+    linear-gradient(300deg, rgba(244, 114, 182, 0.035), transparent 38%),
+    rgba(2, 6, 23, 0.8);
+  box-shadow:
+    0 30px 72px rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+
+.card-detail-showcase.is-owned {
+  border-color: rgba(103, 232, 249, 0.26);
+  box-shadow:
+    0 32px 76px rgba(0, 0, 0, 0.38),
+    0 0 38px rgba(34, 211, 238, 0.07),
+    inset 0 1px 0 rgba(207, 250, 254, 0.1);
+}
+
+.card-detail-artwork-stage {
+  position: relative;
+  display: grid;
+  align-content: center;
+  min-width: 0;
+  padding: clamp(1.5rem, 4vw, 3.5rem);
+  border-bottom: 1px solid rgba(103, 232, 249, 0.1);
+  background:
+    radial-gradient(circle at 50% 40%, rgba(34, 211, 238, 0.1), transparent 44%),
+    linear-gradient(145deg, rgba(15, 23, 42, 0.72), rgba(2, 6, 23, 0.9));
+}
+
+.card-detail-catalog-mark {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  display: flex;
+  gap: 0.65rem;
+  color: rgba(148, 163, 184, 0.55);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.card-detail-artwork {
+  filter: none;
+}
+
+.card-detail-artwork.is-missing-artwork.has-image img {
+  filter: saturate(0.92) brightness(0.94) contrast(1.01);
+}
+
+.card-detail-record {
+  min-width: 0;
+  padding: clamp(1.5rem, 4vw, 3.5rem);
+}
+
+.card-detail-token {
+  display: inline-flex;
+  min-height: 1.625rem;
+  align-items: center;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 5px;
+  padding: 0.25rem 0.5rem;
+  background: rgba(148, 163, 184, 0.055);
+  color: #cbd5e1;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.card-detail-metrics {
+  border: 1px solid rgba(148, 163, 184, 0.1);
+  background: rgba(148, 163, 184, 0.1);
+}
+
+.card-detail-metrics > div {
+  padding: 1rem;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.025), transparent 48%),
+    rgba(2, 6, 23, 0.78);
+}
+
+.card-detail-metrics dt {
+  color: #64748b;
+  font-size: 0.65rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.card-detail-metrics dd {
+  margin-top: 0.45rem;
+  color: #f8fafc;
+  font-size: 1.05rem;
+  font-weight: 900;
+}
+
+.card-detail-provenance {
+  border-left: 2px solid rgba(103, 232, 249, 0.24);
+  padding-left: 1rem;
+}
+
+.card-detail-ledger {
+  background:
+    linear-gradient(110deg, rgba(34, 211, 238, 0.035), transparent 36%),
+    rgba(3, 7, 18, 0.72);
+}
+
+@media (min-width: 1024px) {
+  .card-detail-showcase {
+    grid-template-columns: minmax(22rem, 0.88fr) minmax(0, 1.12fr);
+  }
+
+  .card-detail-artwork-stage {
+    border-right: 1px solid rgba(103, 232, 249, 0.1);
+    border-bottom: 0;
+  }
+}
+
+.collection-card.is-missing:hover .card-artwork-slot.is-missing-artwork.has-image img {
+  filter: saturate(0.64) brightness(0.78) contrast(0.95);
 }
 
 .card-artwork-loading {
