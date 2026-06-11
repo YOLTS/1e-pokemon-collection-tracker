@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { unstable_noStore as noStore } from "next/cache";
+import { RarityIntelligence } from "@/components/CollectionIntelligence";
 import { StatCard } from "@/components/StatCard";
 import { VariantTable } from "@/components/VariantTable";
 import { summarizeVariants } from "@/lib/collection";
 import { formatCurrency } from "@/lib/format";
+import { buildRarityIntelligence } from "@/lib/collection-intelligence";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -55,6 +57,7 @@ export default async function CardsPage({ searchParams }: CardsPageProps) {
   });
 
   const summary = summarizeVariants(variants);
+  const rarityIntelligence = buildRarityIntelligence(variants);
 
   return (
     <div className="space-y-6">
@@ -105,6 +108,8 @@ export default async function CardsPage({ searchParams }: CardsPageProps) {
         <StatCard label="Missing" value={String(summary.missingVariants)} tone="rose" />
         <StatCard label="Remaining cost" value={formatCurrency(summary.estimatedRemainingCost)} tone="amber" />
       </section>
+
+      <RarityIntelligence rarities={rarityIntelligence} />
 
       {variants.length > 0 ? (
         <VariantTable variants={variants} showSet={!selectedSet} />

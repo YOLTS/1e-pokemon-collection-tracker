@@ -523,6 +523,117 @@ textarea {
   transform: translateY(-1px);
 }
 
+.intelligence-panel {
+  background:
+    linear-gradient(115deg, rgba(34, 211, 238, 0.045), transparent 32%),
+    linear-gradient(300deg, rgba(244, 114, 182, 0.025), transparent 34%),
+    rgba(3, 7, 18, 0.72);
+}
+
+.intelligence-block {
+  min-width: 0;
+  border: 1px solid rgba(148, 163, 184, 0.1);
+  border-radius: 7px;
+  padding: 1rem;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.025), transparent 46%),
+    rgba(2, 6, 23, 0.58);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+}
+
+.intelligence-label {
+  color: #94a3b8;
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.intelligence-callout {
+  border-left: 2px solid rgba(251, 191, 36, 0.48);
+  padding: 0.65rem 0.75rem;
+  background: linear-gradient(90deg, rgba(251, 191, 36, 0.075), transparent);
+  transition: border-color 180ms ease, background-color 180ms ease;
+}
+
+.intelligence-callout:hover {
+  border-color: rgba(251, 191, 36, 0.78);
+  background-color: rgba(251, 191, 36, 0.035);
+}
+
+.intelligence-callout span,
+.intelligence-callout small {
+  display: block;
+  color: #64748b;
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.intelligence-callout strong {
+  display: block;
+  margin: 0.2rem 0;
+  color: #f8fafc;
+  font-size: 0.95rem;
+}
+
+.intelligence-ranking,
+.intelligence-card-row,
+.intelligence-ranking-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border: 1px solid rgba(148, 163, 184, 0.08);
+  border-radius: 6px;
+  padding: 0.7rem 0.75rem;
+  background: rgba(15, 23, 42, 0.32);
+  transition: border-color 180ms ease, background-color 180ms ease, filter 180ms ease;
+}
+
+.intelligence-ranking:hover,
+.intelligence-card-row:hover,
+.intelligence-ranking-card:hover {
+  border-color: rgba(103, 232, 249, 0.22);
+  background-color: rgba(34, 211, 238, 0.045);
+  filter: brightness(1.05);
+}
+
+.intelligence-rank {
+  color: rgba(103, 232, 249, 0.66);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.intelligence-ranking-card {
+  min-height: 4.25rem;
+}
+
+.rarity-intelligence {
+  --rarity-accent: 148 163 184;
+  --rarity-accent-2: 100 116 139;
+  display: grid;
+  gap: 0.25rem;
+  border: 1px solid rgba(var(--rarity-accent), 0.15);
+  border-radius: 6px;
+  padding: 0.8rem;
+  background:
+    linear-gradient(145deg, rgba(var(--rarity-accent), 0.05), transparent 52%),
+    rgba(2, 6, 23, 0.52);
+}
+
+.rarity-intelligence strong {
+  color: #f8fafc;
+  font-size: 1.2rem;
+  font-weight: 900;
+}
+
+.rarity-intelligence small {
+  color: #64748b;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
 .set-archive-header {
   background:
     linear-gradient(110deg, rgba(34, 211, 238, 0.055), transparent 34%),

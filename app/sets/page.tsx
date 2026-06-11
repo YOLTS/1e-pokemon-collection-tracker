@@ -1,4 +1,5 @@
 import { unstable_noStore as noStore } from "next/cache";
+import { SetRankings } from "@/components/CollectionIntelligence";
 import { SetProgressCard } from "@/components/SetProgressCard";
 import { StatCard } from "@/components/StatCard";
 import { summarizeVariants } from "@/lib/collection";
@@ -25,6 +26,26 @@ export default async function SetsPage() {
 
   const allVariants = sets.flatMap((set) => set.cards.flatMap((card) => card.variants));
   const allSummary = summarizeVariants(allVariants);
+  const setMetrics = sets.map((set) => {
+    const variants = set.cards.flatMap((card) => card.variants);
+    const summary = summarizeVariants(variants);
+    return {
+      set,
+      variants,
+      summary,
+      metric: {
+        name: set.name,
+        slug: set.slug,
+        owned: summary.ownedVariants,
+        missing: summary.missingVariants,
+        total: summary.totalVariants,
+        completion: summary.completion,
+      },
+    };
+  });
+  const rankedSets = setMetrics.map(({ metric }) => metric).sort(
+    (a, b) => b.completion - a.completion || b.owned - a.owned || a.missing - b.missing,
+  );
 
   return (
     <div className="space-y-6">
@@ -46,10 +67,10 @@ export default async function SetsPage() {
         <StatCard label="Remaining cost" value={formatCurrency(allSummary.estimatedRemainingCost)} tone="amber" />
       </section>
 
+      <SetRankings sets={rankedSets} />
+
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {sets.map((set) => {
-          const setVariants = set.cards.flatMap((card) => card.variants);
-          const summary = summarizeVariants(setVariants);
+        {setMetrics.map(({ set, variants: setVariants, summary }) => {
           const holoVariants = setVariants.filter((variant) => variant.finish === "HOLO");
           const holoOwned = holoVariants.filter((variant) =>
             variant.ownedItems.some((item) => item.status === "OWNED"),

@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { unstable_noStore as noStore } from "next/cache";
+import { CollectionIntelligence } from "@/components/CollectionIntelligence";
 import { ProgressDonut } from "@/components/ProgressDonut";
 import { SetProgressCard } from "@/components/SetProgressCard";
 import { StatCard } from "@/components/StatCard";
 import { formatEnumLabel, summarizeVariants } from "@/lib/collection";
 import { formatCurrency } from "@/lib/format";
+import { buildCollectionIntelligence } from "@/lib/collection-intelligence";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -27,7 +29,10 @@ export default async function DashboardPage() {
     }),
     prisma.cardVariant.findMany({
       where: { isMasterSetCandidate: true },
-      include: { ownedItems: true },
+      include: {
+        ownedItems: true,
+        card: { include: { set: { select: { name: true, slug: true } } } },
+      },
     }),
     prisma.collectionItem.findMany({
       where: { status: "OWNED" },
@@ -60,6 +65,17 @@ export default async function DashboardPage() {
   const holoOwned = setMetrics.reduce((total, metric) => total + metric.holoOwned, 0);
   const holoTotal = setMetrics.reduce((total, metric) => total + metric.holoTotal, 0);
   const leadingSet = [...setMetrics].sort((a, b) => b.setSummary.completion - a.setSummary.completion)[0];
+  const intelligence = buildCollectionIntelligence(
+    variants,
+    setMetrics.map(({ set, setSummary }) => ({
+      name: set.name,
+      slug: set.slug,
+      owned: setSummary.ownedVariants,
+      missing: setSummary.missingVariants,
+      total: setSummary.totalVariants,
+      completion: setSummary.completion,
+    })),
+  );
   const heroActivity = [
     recentItems[0]
       ? `${recentItems[0].variant.card.name} marked owned`
@@ -240,6 +256,14 @@ export default async function DashboardPage() {
           </div>
         </section>
       </section>
+
+      <CollectionIntelligence
+        nextMilestone={intelligence.nextMilestone}
+        cardsToMilestone={intelligence.cardsToMilestone}
+        leadingSets={intelligence.leadingSets}
+        closestSet={intelligence.closestSet}
+        rarestOwned={intelligence.rarestOwned}
+      />
     </div>
   );
 }
