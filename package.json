@@ -12,7 +12,8 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "prisma db seed",
-    "images:match": "tsx scripts/match-card-images.ts"
+    "images:match": "tsx scripts/match-card-images.ts",
+    "prices:sync": "tsx scripts/sync-card-prices.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

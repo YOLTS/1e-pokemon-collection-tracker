@@ -10,6 +10,7 @@ type SetProgressCardProps = {
   missing?: number;
   ownedValue?: number;
   remainingValue?: number;
+  priced?: number;
   holoOwned?: number;
   holoTotal?: number;
 };
@@ -22,6 +23,7 @@ export function SetProgressCard({
   missing = Math.max(total - owned, 0),
   ownedValue = 0,
   remainingValue = 0,
+  priced,
   holoOwned,
   holoTotal,
 }: SetProgressCardProps) {
@@ -69,13 +71,16 @@ export function SetProgressCard({
       <div className="neon-divider mt-4" />
       <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
         <div>
-          <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Owned value</p>
+          <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Priced owned</p>
           <p className="mt-1 font-black text-white">{formatCurrency(ownedValue)}</p>
         </div>
         <div>
-          <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Remaining</p>
+          <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Priced missing</p>
           <p className="mt-1 font-black text-white">{formatCurrency(remainingValue)}</p>
         </div>
+        {priced !== undefined ? (
+          <p className="col-span-2 text-xs font-semibold text-slate-500">{priced} / {total} cards priced</p>
+        ) : null}
         {holoTotal !== undefined && holoOwned !== undefined ? (
           <div className="col-span-2 flex items-center justify-between rounded-md border border-fuchsia-300/20 bg-fuchsia-400/[0.07] px-3 py-2 text-xs font-bold text-fuchsia-100">
             <span>Holo progress</span>

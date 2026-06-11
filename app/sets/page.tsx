@@ -64,7 +64,12 @@ export default async function SetsPage() {
         <StatCard label="Tracked sets" value={String(sets.length)} tone="cyan" />
         <StatCard label="Seeded targets" value={String(allSummary.totalVariants)} />
         <StatCard label="Owned targets" value={String(allSummary.ownedVariants)} tone="green" />
-        <StatCard label="Remaining cost" value={formatCurrency(allSummary.estimatedRemainingCost)} tone="amber" />
+        <StatCard
+          label="Remaining cost"
+          value={formatCurrency(allSummary.estimatedRemainingCost)}
+          helper={`${allSummary.pricedVariants} / ${allSummary.totalVariants} cards priced`}
+          tone="amber"
+        />
       </section>
 
       <SetRankings sets={rankedSets} />
@@ -86,6 +91,7 @@ export default async function SetsPage() {
               missing={summary.missingVariants}
               ownedValue={summary.estimatedCollectionValue}
               remainingValue={summary.estimatedRemainingCost}
+              priced={summary.pricedVariants}
               holoOwned={holoOwned}
               holoTotal={holoVariants.length}
             />

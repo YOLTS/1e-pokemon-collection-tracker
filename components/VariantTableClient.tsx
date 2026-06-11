@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { CardArtwork } from "@/components/CardArtwork";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, formatMarketPrice } from "@/lib/format";
 import { compareRarity, rarityToken } from "@/lib/rarity";
+import type { PricingDebugSummary } from "@/components/VariantTable";
 
 type OwnedItemRow = {
   id: number;
@@ -23,6 +24,13 @@ type VariantRow = {
   edition: string;
   finish: string;
   estimatedValue: number;
+  marketPrice: number | null;
+  marketPriceStatus: string;
+  priceSnapshots?: Array<{
+    marketPrice: number;
+    source: string;
+    capturedAt: Date;
+  }>;
   notes: string;
   card: {
     cardNumber: string;
@@ -45,6 +53,7 @@ type VariantRow = {
 type VariantTableClientProps = {
   variants: VariantRow[];
   showSet?: boolean;
+  pricingDebug?: PricingDebugSummary;
   toggleOwnedAction: (formData: FormData) => void | Promise<void>;
 };
 
@@ -68,6 +77,15 @@ function getPrimaryCopy(variant: VariantRow) {
   );
 }
 
+function provisionalPrice(variant: VariantRow) {
+  const snapshot = variant.priceSnapshots?.[0];
+  if (snapshot?.source === "POKEMON_TCG_API_TCGPLAYER") {
+    return snapshot.marketPrice;
+  }
+
+  return variant.marketPriceStatus === "EXACT_1ST_EDITION" ? variant.marketPrice : null;
+}
+
 function formatEnumLabel(value?: string | null) {
   if (!value) {
     return "-";
@@ -83,6 +101,7 @@ function formatEnumLabel(value?: string | null) {
 export function VariantTableClient({
   variants,
   showSet = false,
+  pricingDebug,
   toggleOwnedAction,
 }: VariantTableClientProps) {
   const [query, setQuery] = useState("");
@@ -122,10 +141,6 @@ export function VariantTableClient({
         return matchesOwned && matchesRarity && matchesQuery;
       })
       .sort((a, b) => {
-        if (showSet && a.card.set.name !== b.card.set.name) {
-          return a.card.set.name.localeCompare(b.card.set.name);
-        }
-
         if (sortKey === "name") {
           return a.card.name.localeCompare(b.card.name);
         }
@@ -138,17 +153,20 @@ export function VariantTableClient({
         }
 
         if (sortKey === "owned") {
-          return (
-            Number(hasOwnedCopy(b)) - Number(hasOwnedCopy(a)) ||
-            cardNumberValue(a.card.cardNumber) - cardNumberValue(b.card.cardNumber)
-          );
+          return Number(hasOwnedCopy(b)) - Number(hasOwnedCopy(a));
         }
 
         if (sortKey === "value") {
-          return (
-            b.estimatedValue - a.estimatedValue ||
-            cardNumberValue(a.card.cardNumber) - cardNumberValue(b.card.cardNumber)
-          );
+          const aPrice = provisionalPrice(a);
+          const bPrice = provisionalPrice(b);
+          if (aPrice === null && bPrice !== null) return 1;
+          if (aPrice !== null && bPrice === null) return -1;
+          if (aPrice !== null && bPrice !== null) return bPrice - aPrice;
+          return 0;
+        }
+
+        if (showSet && a.card.set.name !== b.card.set.name) {
+          return a.card.set.name.localeCompare(b.card.set.name);
         }
 
         return cardNumberValue(a.card.cardNumber) - cardNumberValue(b.card.cardNumber);
@@ -168,6 +186,14 @@ export function VariantTableClient({
             <p className="mt-1 text-sm text-slate-400">
               Showing {filteredVariants.length} of {variants.length} cards, {visibleOwned} owned
             </p>
+            {pricingDebug ? (
+              <p className="mt-2 text-xs font-semibold text-amber-100/75">
+                Pricing debug: {pricingDebug.pricedCards} priced · Highest {pricingDebug.highestPricedCard ?? "Unavailable"} · {formatMarketPrice(pricingDebug.highestPricedValue)} ·{" "}
+                <Link href="/pricing-audit" className="text-cyan-200 underline decoration-cyan-300/30 underline-offset-2 hover:text-white">
+                  Review all prices
+                </Link>
+              </p>
+            ) : null}
           </div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:min-w-[760px]">
             <label className="block">
@@ -227,6 +253,7 @@ export function VariantTableClient({
       <div className="collection-grid grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3">
         {filteredVariants.map((variant) => {
           const owned = hasOwnedCopy(variant);
+          const marketPrice = provisionalPrice(variant);
           const primaryCopy = getPrimaryCopy(variant);
           const notes = primaryCopy?.notes || variant.notes;
 
@@ -297,8 +324,10 @@ export function VariantTableClient({
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-[10px] font-black uppercase tracking-wide text-slate-600">Value</dt>
-                  <dd className="mt-1 font-black text-white">{formatCurrency(variant.estimatedValue)}</dd>
+                  <dt className="text-[10px] font-black uppercase tracking-wide text-slate-600">Market</dt>
+                  <dd className={`mt-1 font-black ${variant.marketPriceStatus === "EXACT_1ST_EDITION" ? "text-white" : "text-slate-600"}`}>
+                    {formatMarketPrice(marketPrice)}
+                  </dd>
                 </div>
                 <div>
                   <dt className="text-[10px] font-black uppercase tracking-wide text-slate-600">Paid</dt>

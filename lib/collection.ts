@@ -17,17 +17,26 @@ export function getPrimaryCopy(variant: VariantWithOwnership) {
   );
 }
 
+export function getProvisionalMarketPrice(variant: Pick<CardVariant, "marketPrice" | "marketPriceStatus">) {
+  return variant.marketPriceStatus === "EXACT_1ST_EDITION" && variant.marketPrice !== null
+    ? variant.marketPrice
+    : null;
+}
+
 export function summarizeVariants(variants: VariantWithOwnership[]) {
   const masterVariants = variants.filter((variant) => variant.isMasterSetCandidate);
   const ownedVariants = masterVariants.filter(hasOwnedCopy);
   const missingVariants = masterVariants.filter((variant) => !hasOwnedCopy(variant));
+  const pricedVariants = masterVariants.filter((variant) => getProvisionalMarketPrice(variant) !== null);
+  const pricedOwnedVariants = ownedVariants.filter((variant) => getProvisionalMarketPrice(variant) !== null);
+  const pricedMissingVariants = missingVariants.filter((variant) => getProvisionalMarketPrice(variant) !== null);
 
   const estimatedCollectionValue = ownedVariants.reduce(
-    (total, variant) => total + variant.estimatedValue,
+    (total, variant) => total + (getProvisionalMarketPrice(variant) ?? 0),
     0,
   );
   const estimatedRemainingCost = missingVariants.reduce(
-    (total, variant) => total + variant.estimatedValue,
+    (total, variant) => total + (getProvisionalMarketPrice(variant) ?? 0),
     0,
   );
 
@@ -39,6 +48,9 @@ export function summarizeVariants(variants: VariantWithOwnership[]) {
       masterVariants.length === 0 ? 0 : (ownedVariants.length / masterVariants.length) * 100,
     estimatedCollectionValue,
     estimatedRemainingCost,
+    pricedVariants: pricedVariants.length,
+    pricedOwnedVariants: pricedOwnedVariants.length,
+    pricedMissingVariants: pricedMissingVariants.length,
   };
 }
 

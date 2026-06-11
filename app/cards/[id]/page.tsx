@@ -5,7 +5,7 @@ import { updateVariantDetails } from "@/app/actions";
 import { CardArtwork } from "@/components/CardArtwork";
 import { CARD_CONDITION } from "@/lib/domain";
 import { formatEnumLabel, getPrimaryCopy, hasOwnedCopy } from "@/lib/collection";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, formatMarketPrice } from "@/lib/format";
 import { rarityToken } from "@/lib/rarity";
 import { prisma } from "@/lib/prisma";
 
@@ -131,7 +131,10 @@ export default async function CardDetailPage({ params, searchParams }: CardDetai
           <dl className="card-detail-metrics mt-7 grid gap-px overflow-hidden rounded-lg sm:grid-cols-2">
             <div><dt>Condition</dt><dd>{formatEnumLabel(primaryCopy?.condition)}</dd></div>
             <div><dt>Grading</dt><dd>{gradingLabel}</dd></div>
-            <div><dt>Estimated value</dt><dd>{formatCurrency(variant.estimatedValue)}</dd></div>
+            <div>
+              <dt>Estimated market value</dt>
+              <dd>{formatMarketPrice(variant.marketPriceStatus === "EXACT_1ST_EDITION" ? variant.marketPrice : null)}</dd>
+            </div>
             <div><dt>Acquisition cost</dt><dd>{primaryCopy?.purchasePrice ? formatCurrency(primaryCopy.purchasePrice) : "Not recorded"}</dd></div>
           </dl>
 
@@ -180,7 +183,7 @@ export default async function CardDetailPage({ params, searchParams }: CardDetai
             </label>
 
             <label className="block">
-              <span className="text-xs font-bold uppercase tracking-wide text-slate-500">Estimated value</span>
+              <span className="text-xs font-bold uppercase tracking-wide text-slate-500">Manual estimated value</span>
               <input
                 name="estimatedValue"
                 type="number"

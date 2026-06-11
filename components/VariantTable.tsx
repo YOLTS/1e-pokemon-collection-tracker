@@ -7,18 +7,31 @@ export type VariantRow = CardVariant & {
     set: Pick<PokemonSet, "name" | "slug" | "symbol" | "color">;
   };
   ownedItems: CollectionItem[];
+  priceSnapshots?: Array<{
+    marketPrice: number;
+    source: string;
+    capturedAt: Date;
+  }>;
+};
+
+export type PricingDebugSummary = {
+  pricedCards: number;
+  highestPricedCard: string | null;
+  highestPricedValue: number | null;
 };
 
 type VariantTableProps = {
   variants: VariantRow[];
   showSet?: boolean;
+  pricingDebug?: PricingDebugSummary;
 };
 
-export function VariantTable({ variants, showSet = false }: VariantTableProps) {
+export function VariantTable({ variants, showSet = false, pricingDebug }: VariantTableProps) {
   return (
     <VariantTableClient
       variants={variants}
       showSet={showSet}
+      pricingDebug={pricingDebug}
       toggleOwnedAction={toggleVariantOwned}
     />
   );

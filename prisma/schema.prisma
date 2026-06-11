@@ -66,6 +66,11 @@ model CardVariant {
   isMasterSetCandidate Boolean          @default(true)
   estimatedValue       Float            @default(0)
   targetBuyPrice       Float?
+  marketPrice          Float?
+  marketPriceSource    String?
+  marketPriceStatus    String           @default("UNAVAILABLE")
+  marketPriceBucket    String?
+  marketPriceUpdatedAt DateTime?
   notes                String           @default("")
   ownedItems           CollectionItem[]
   priceSnapshots       PriceSnapshot[]
@@ -76,6 +81,7 @@ model CardVariant {
   @@index([cardId])
   @@index([edition, finish, language])
   @@index([isMasterSetCandidate])
+  @@index([marketPriceStatus])
 }
 
 model CollectionItem {

@@ -41,6 +41,12 @@ export default async function CardsPage({ searchParams }: CardsPageProps) {
     ],
     include: {
       ownedItems: true,
+      priceSnapshots: {
+        where: { source: "POKEMON_TCG_API_TCGPLAYER" },
+        orderBy: { capturedAt: "desc" },
+        take: 1,
+        select: { marketPrice: true, source: true, capturedAt: true },
+      },
       card: {
         include: {
           set: {
@@ -58,6 +64,19 @@ export default async function CardsPage({ searchParams }: CardsPageProps) {
 
   const summary = summarizeVariants(variants);
   const rarityIntelligence = buildRarityIntelligence(variants);
+  const pricedVariants = variants.filter(
+    (variant) => variant.priceSnapshots[0]?.source === "POKEMON_TCG_API_TCGPLAYER",
+  );
+  const highestPricedVariant = [...pricedVariants].sort(
+    (a, b) => (b.priceSnapshots[0]?.marketPrice ?? 0) - (a.priceSnapshots[0]?.marketPrice ?? 0),
+  )[0];
+  const pricingDebug = {
+    pricedCards: pricedVariants.length,
+    highestPricedCard: highestPricedVariant
+      ? `${highestPricedVariant.card.name} (${highestPricedVariant.card.set.name})`
+      : null,
+    highestPricedValue: highestPricedVariant?.priceSnapshots[0]?.marketPrice ?? null,
+  };
 
   return (
     <div className="space-y-6">
@@ -106,13 +125,18 @@ export default async function CardsPage({ searchParams }: CardsPageProps) {
         <StatCard label="Variants" value={String(summary.totalVariants)} />
         <StatCard label="Owned" value={String(summary.ownedVariants)} tone="green" />
         <StatCard label="Missing" value={String(summary.missingVariants)} tone="rose" />
-        <StatCard label="Remaining cost" value={formatCurrency(summary.estimatedRemainingCost)} tone="amber" />
+        <StatCard
+          label="Remaining cost"
+          value={formatCurrency(summary.estimatedRemainingCost)}
+          helper={`${summary.pricedVariants} / ${summary.totalVariants} cards priced`}
+          tone="amber"
+        />
       </section>
 
       <RarityIntelligence rarities={rarityIntelligence} />
 
       {variants.length > 0 ? (
-        <VariantTable variants={variants} showSet={!selectedSet} />
+        <VariantTable variants={variants} showSet={!selectedSet} pricingDebug={pricingDebug} />
       ) : (
         <section className="neon-panel rounded-lg p-8 text-center">
           <p className="font-semibold text-slate-400">No cards match this view.</p>

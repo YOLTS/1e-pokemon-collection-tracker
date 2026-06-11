@@ -31,6 +31,12 @@ export default async function SetDetailPage({ params }: SetDetailPageProps) {
             orderBy: { id: "asc" },
             include: {
               ownedItems: true,
+              priceSnapshots: {
+                where: { source: "POKEMON_TCG_API_TCGPLAYER" },
+                orderBy: { capturedAt: "desc" },
+                take: 1,
+                select: { marketPrice: true, source: true, capturedAt: true },
+              },
               card: {
                 include: { set: { select: { name: true, slug: true, symbol: true, color: true } } },
               },
@@ -93,8 +99,18 @@ export default async function SetDetailPage({ params }: SetDetailPageProps) {
         <StatCard label="Seeded variants" value={String(summary.totalVariants)} />
         <StatCard label="Owned" value={String(summary.ownedVariants)} tone="green" />
         <StatCard label="Missing" value={String(summary.missingVariants)} tone="rose" />
-        <StatCard label="Owned value" value={formatCurrency(summary.estimatedCollectionValue)} tone="green" />
-        <StatCard label="Remaining cost" value={formatCurrency(summary.estimatedRemainingCost)} tone="amber" />
+        <StatCard
+          label="Owned value"
+          value={formatCurrency(summary.estimatedCollectionValue)}
+          helper={`${summary.pricedOwnedVariants} priced owned cards`}
+          tone="green"
+        />
+        <StatCard
+          label="Remaining cost"
+          value={formatCurrency(summary.estimatedRemainingCost)}
+          helper={`${summary.pricedVariants} / ${summary.totalVariants} cards priced`}
+          tone="amber"
+        />
       </section>
 
       <section className="neon-panel rounded-lg p-5">

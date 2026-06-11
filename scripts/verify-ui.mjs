@@ -6,6 +6,7 @@ const routes = [
   { path: "/", label: "Dashboard" },
   { path: "/sets", label: "Sets" },
   { path: "/cards", label: "Cards" },
+  { path: "/pricing-audit", label: "Pricing audit" },
   { path: "/sets/base-set", label: "Base Set detail" },
 ];
 
@@ -25,6 +26,20 @@ function assertDashboardRouteFile() {
 
   if (!/export\s+default\s+(async\s+)?function\s+\w+/.test(pageSource)) {
     fail("app/page.tsx exists, but no default page component export was found.");
+  }
+}
+
+function assertCardDetailRouteFile() {
+  const pagePath = "app/cards/[id]/page.tsx";
+
+  if (!existsSync(pagePath)) {
+    fail("app/cards/[id]/page.tsx is missing, so card detail links cannot resolve.");
+  }
+
+  const pageSource = readFileSync(pagePath, "utf8");
+
+  if (!/export\s+default\s+(async\s+)?function\s+\w+/.test(pageSource)) {
+    fail("app/cards/[id]/page.tsx exists, but no default page component export was found.");
   }
 }
 
@@ -136,10 +151,30 @@ async function verifyRoute(route) {
   console.log(`ok ${route.path} (${route.label})`);
 }
 
+async function verifyCardDetailRoute() {
+  const cardsUrl = toAbsoluteUrl("/cards");
+  const { response, text: cardsHtml } = await fetchText(cardsUrl);
+
+  if (!response.ok) {
+    fail(`could not discover a card detail link because /cards returned HTTP ${response.status}.`);
+  }
+
+  const detailPath = cardsHtml.match(/href=["'](\/cards\/\d+)["']/)?.[1];
+
+  if (!detailPath) {
+    fail("no numeric card detail link was found in the rendered /cards page.");
+  }
+
+  await verifyRoute({ path: detailPath, label: "Card detail" });
+}
+
 assertDashboardRouteFile();
+assertCardDetailRouteFile();
 
 for (const route of routes) {
   await verifyRoute(route);
 }
 
-console.log("\nUI verification passed: homepage, set list, card list, set detail, and compiled Tailwind/global CSS are healthy.");
+await verifyCardDetailRoute();
+
+console.log("\nUI verification passed: homepage, set list, card list, set detail, card detail, and compiled Tailwind/global CSS are healthy.");

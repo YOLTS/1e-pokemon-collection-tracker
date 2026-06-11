@@ -634,6 +634,31 @@ textarea {
   font-weight: 700;
 }
 
+.pricing-audit-table th {
+  border-bottom: 1px solid rgba(103, 232, 249, 0.14);
+  padding: 0.85rem 1rem;
+  background: rgba(2, 6, 23, 0.86);
+  color: #64748b;
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.pricing-audit-table td {
+  border-bottom: 1px solid rgba(148, 163, 184, 0.075);
+  padding: 0.8rem 1rem;
+}
+
+.pricing-audit-table tbody tr {
+  background: rgba(2, 6, 23, 0.38);
+  transition: background-color 160ms ease;
+}
+
+.pricing-audit-table tbody tr:hover {
+  background: rgba(34, 211, 238, 0.04);
+}
+
 .set-archive-header {
   background:
     linear-gradient(110deg, rgba(34, 211, 238, 0.055), transparent 34%),

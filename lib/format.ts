@@ -6,6 +6,10 @@ export function formatCurrency(value: number) {
   }).format(value);
 }
 
+export function formatMarketPrice(value?: number | null) {
+  return value === null || value === undefined ? "Unavailable" : formatCurrency(value);
+}
+
 export function formatPercent(value: number) {
   return `${Math.round(value)}%`;
 }

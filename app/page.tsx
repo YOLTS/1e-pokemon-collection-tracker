@@ -5,7 +5,7 @@ import { ProgressDonut } from "@/components/ProgressDonut";
 import { SetProgressCard } from "@/components/SetProgressCard";
 import { StatCard } from "@/components/StatCard";
 import { formatEnumLabel, summarizeVariants } from "@/lib/collection";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, formatMarketPrice } from "@/lib/format";
 import { buildCollectionIntelligence } from "@/lib/collection-intelligence";
 import { prisma } from "@/lib/prisma";
 
@@ -151,8 +151,8 @@ export default async function DashboardPage() {
                     <dd className="text-2xl text-amber-100 sm:text-3xl">{formatCurrency(summary.estimatedRemainingCost)}</dd>
                   </div>
                   <div className="flex items-center justify-between gap-3 border-t border-white/10 pt-3 text-sm normal-case tracking-normal text-slate-400">
-                    <span>Portfolio basis</span>
-                    <span className="font-bold text-cyan-100/80">Spreadsheet market estimates</span>
+                    <span>{summary.pricedVariants} / {summary.totalVariants} cards priced</span>
+                    <span className="font-bold text-cyan-100/80">Exact 1st Edition TCGplayer market</span>
                   </div>
                 </dl>
               </div>
@@ -217,6 +217,7 @@ export default async function DashboardPage() {
                   missing={setSummary.missingVariants}
                   ownedValue={setSummary.estimatedCollectionValue}
                   remainingValue={setSummary.estimatedRemainingCost}
+                  priced={setSummary.pricedVariants}
                   holoOwned={holoOwned}
                   holoTotal={holoTotal}
                 />
@@ -244,7 +245,9 @@ export default async function DashboardPage() {
                   </span>
                 </div>
                 <p className="mt-3 text-sm text-slate-400">
-                  {formatEnumLabel(item.condition)} - {formatCurrency(item.variant.estimatedValue)}
+                  {formatEnumLabel(item.condition)} - {formatMarketPrice(
+                    item.variant.marketPriceStatus === "EXACT_1ST_EDITION" ? item.variant.marketPrice : null,
+                  )}
                 </p>
               </div>
             ))}

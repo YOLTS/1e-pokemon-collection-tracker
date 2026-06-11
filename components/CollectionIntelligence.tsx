@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { formatCurrency, formatPercent } from "@/lib/format";
+import { formatMarketPrice, formatPercent } from "@/lib/format";
 import { rarityToken } from "@/lib/rarity";
 import type { SetIntelligenceMetric } from "@/lib/collection-intelligence";
 
@@ -23,7 +23,7 @@ type CollectionIntelligenceProps = {
     rarity: string;
     setName: string;
     setSlug: string;
-    estimatedValue: number;
+    marketPrice: number | null;
   }>;
 };
 
@@ -90,7 +90,7 @@ export function CollectionIntelligence({
                   <strong className="block truncate text-sm text-white">{card.name}</strong>
                   <small className="text-slate-500">{card.setName} · #{card.cardNumber}</small>
                 </span>
-                <span className="text-sm font-black text-slate-300">{formatCurrency(card.estimatedValue)}</span>
+                <span className="text-sm font-black text-slate-300">{formatMarketPrice(card.marketPrice)}</span>
               </Link>
             ))}
             {rarestOwned.length === 0 ? <p className="text-sm text-slate-500">Owned-card intelligence will appear after your first addition.</p> : null}
