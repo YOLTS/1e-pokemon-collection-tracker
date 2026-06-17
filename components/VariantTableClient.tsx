@@ -3,11 +3,10 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { CardArtwork } from "@/components/CardArtwork";
+import { isManualMarketPriceSource } from "@/lib/domain";
 import { formatCurrency, formatMarketPrice } from "@/lib/format";
 import { compareRarity, rarityToken } from "@/lib/rarity";
 import type { PricingDebugSummary } from "@/components/VariantTable";
-
-const manualSpreadsheetSource = "MANUAL_SPREADSHEET";
 
 type OwnedItemRow = {
   id: number;
@@ -80,7 +79,7 @@ function getPrimaryCopy(variant: VariantRow) {
 }
 
 function marketPrice(variant: VariantRow) {
-  if (variant.marketPriceSource === manualSpreadsheetSource && variant.marketPrice !== null) {
+  if (isManualMarketPriceSource(variant.marketPriceSource) && variant.marketPrice !== null) {
     return variant.marketPrice;
   }
 

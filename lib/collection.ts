@@ -1,5 +1,5 @@
 import type { CardVariant, CollectionItem } from "@prisma/client";
-import { OWNERSHIP_STATUS, PRICE_SOURCE } from "@/lib/domain";
+import { isManualMarketPriceSource, OWNERSHIP_STATUS } from "@/lib/domain";
 
 export type VariantWithOwnership = CardVariant & {
   ownedItems: CollectionItem[];
@@ -20,7 +20,7 @@ export function getPrimaryCopy(variant: VariantWithOwnership) {
 export function getMarketPrice(
   variant: Pick<CardVariant, "estimatedValue" | "marketPrice" | "marketPriceSource">,
 ) {
-  if (variant.marketPriceSource === PRICE_SOURCE.MANUAL_SPREADSHEET && variant.marketPrice !== null) {
+  if (isManualMarketPriceSource(variant.marketPriceSource) && variant.marketPrice !== null) {
     return variant.marketPrice;
   }
 

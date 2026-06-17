@@ -3,7 +3,7 @@ import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 const apiBaseUrl = "https://api.pokemontcg.io/v2";
 const priceSource = "POKEMON_TCG_API_TCGPLAYER";
-const manualSource = "MANUAL";
+const manualSources = new Set(["MANUAL", "MANUAL_SPREADSHEET", "MANUAL_APP_EDIT"]);
 const applyChanges = process.argv.includes("--apply");
 
 type ApiSet = {
@@ -160,7 +160,7 @@ function priceResult(
   const genericBucket = variant.finish === "HOLO" ? "holofoil" : "normal";
   const label = `${variant.card.set.name} ${variant.card.cardNumber} ${variant.card.name}`;
 
-  if (variant.marketPriceSource === manualSource) {
+  if (variant.marketPriceSource && manualSources.has(variant.marketPriceSource)) {
     return {
       variantId: variant.id,
       cardLabel: label,

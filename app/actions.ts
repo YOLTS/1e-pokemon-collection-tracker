@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { CARD_CONDITION, GRADING_COMPANY, OWNERSHIP_STATUS } from "@/lib/domain";
+import { CARD_CONDITION, GRADING_COMPANY, OWNERSHIP_STATUS, PRICE_SOURCE } from "@/lib/domain";
 import { prisma } from "@/lib/prisma";
 
 function parseOptionalMoney(value: FormDataEntryValue | null) {
@@ -95,37 +95,54 @@ export async function updateVariantDetails(formData: FormData) {
   }
 
   const primaryCopy = variant.ownedItems[0];
+  const marketPriceUpdatedAt = new Date();
 
-  await prisma.cardVariant.update({
-    where: { id: variantId },
-    data: {
-      estimatedValue,
-      notes: primaryCopy?.status === OWNERSHIP_STATUS.OWNED ? variant.notes : notes,
-    },
-  });
-
-  if (primaryCopy) {
-    await prisma.collectionItem.update({
-      where: { id: primaryCopy.id },
+  await prisma.$transaction(async (tx) => {
+    await tx.cardVariant.update({
+      where: { id: variantId },
       data: {
-        condition,
-        purchasePrice,
-        notes,
+        estimatedValue,
+        marketPrice: estimatedValue,
+        marketPriceSource: PRICE_SOURCE.MANUAL_APP_EDIT,
+        marketPriceStatus: "MANUAL",
+        marketPriceUpdatedAt,
+        notes: primaryCopy?.status === OWNERSHIP_STATUS.OWNED ? variant.notes : notes,
       },
     });
-  } else {
-    await prisma.collectionItem.create({
+
+    await tx.priceSnapshot.create({
       data: {
         variantId,
-        status: OWNERSHIP_STATUS.MISSING,
-        condition,
-        gradingCompany: GRADING_COMPANY.RAW,
-        purchasePrice,
-        notes,
-        isPrimaryCopy: true,
+        source: PRICE_SOURCE.MANUAL_APP_EDIT,
+        marketPrice: estimatedValue,
+        capturedAt: marketPriceUpdatedAt,
+        notes: "Manual estimated value saved in app.",
       },
     });
-  }
+
+    if (primaryCopy) {
+      await tx.collectionItem.update({
+        where: { id: primaryCopy.id },
+        data: {
+          condition,
+          purchasePrice,
+          notes,
+        },
+      });
+    } else {
+      await tx.collectionItem.create({
+        data: {
+          variantId,
+          status: OWNERSHIP_STATUS.MISSING,
+          condition,
+          gradingCompany: GRADING_COMPANY.RAW,
+          purchasePrice,
+          notes,
+          isPrimaryCopy: true,
+        },
+      });
+    }
+  });
 
   revalidatePath("/");
   revalidatePath("/sets");

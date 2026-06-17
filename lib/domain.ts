@@ -53,6 +53,11 @@ export const ACQUISITION_SOURCE = {
 export const PRICE_SOURCE = {
   MANUAL: "MANUAL",
   MANUAL_SPREADSHEET: "MANUAL_SPREADSHEET",
+  MANUAL_APP_EDIT: "MANUAL_APP_EDIT",
   FUTURE_API: "FUTURE_API",
   RECENT_SALE: "RECENT_SALE",
 } as const;
+
+export function isManualMarketPriceSource(source?: string | null) {
+  return source === PRICE_SOURCE.MANUAL_SPREADSHEET || source === PRICE_SOURCE.MANUAL_APP_EDIT;
+}
