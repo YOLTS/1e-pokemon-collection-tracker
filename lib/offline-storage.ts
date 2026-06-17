@@ -35,11 +35,24 @@ function transactionComplete(transaction: IDBTransaction) {
 }
 
 export function isSupportedOfflineSnapshot(value: unknown): value is OfflineSnapshot {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+
+  const candidate = value as Partial<OfflineSnapshot>;
+
   return (
-    typeof value === "object" &&
-    value !== null &&
-    "schemaVersion" in value &&
-    (value as { schemaVersion: unknown }).schemaVersion === OFFLINE_SNAPSHOT_SCHEMA_VERSION
+    candidate.schemaVersion === OFFLINE_SNAPSHOT_SCHEMA_VERSION &&
+    typeof candidate.generatedAt === "string" &&
+    Array.isArray(candidate.sets) &&
+    Array.isArray(candidate.cards) &&
+    Array.isArray(candidate.variants) &&
+    typeof candidate.dashboard === "object" &&
+    candidate.dashboard !== null &&
+    typeof candidate.dashboard.summary === "object" &&
+    candidate.dashboard.summary !== null &&
+    Array.isArray(candidate.dashboard.setMetrics) &&
+    Array.isArray(candidate.dashboard.recentItems)
   );
 }
 

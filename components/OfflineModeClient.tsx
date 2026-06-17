@@ -19,6 +19,20 @@ type OfflineView =
   | { name: "cards" }
   | { name: "card"; id: number };
 
+type OfflineLoadStatus = "loading" | "ready" | "empty" | "error";
+
+type OfflineDebugInfo = {
+  currentPath: string;
+  snapshotLoaded: boolean;
+  schemaVersion: string;
+  generatedAt: string;
+  sets: number;
+  cards: number;
+  variants: number;
+  status: OfflineLoadStatus;
+  error?: string;
+};
+
 function formatEnumLabel(value?: string | null) {
   if (!value) {
     return "-";
@@ -32,10 +46,15 @@ function formatEnumLabel(value?: string | null) {
 }
 
 function formatTimestamp(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "unknown time";
+  }
+
   return new Intl.DateTimeFormat("en-US", {
     dateStyle: "medium",
     timeStyle: "short",
-  }).format(new Date(value));
+  }).format(date);
 }
 
 function initialView(): OfflineView {
@@ -69,11 +88,14 @@ export function OfflineModeClient() {
   const [snapshot, setSnapshot] = useState<OfflineSnapshot | null>(null);
   const [view, setView] = useState<OfflineView>({ name: "dashboard" });
   const [query, setQuery] = useState("");
-  const [status, setStatus] = useState<"loading" | "ready" | "empty" | "error">("loading");
+  const [status, setStatus] = useState<OfflineLoadStatus>("loading");
   const [online, setOnline] = useState(false);
   const [blockedMessage, setBlockedMessage] = useState("");
+  const [currentPath, setCurrentPath] = useState("/");
+  const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
+    setCurrentPath(window.location.pathname);
     setView(initialView());
     setOnline(navigator.onLine);
 
@@ -93,7 +115,10 @@ export function OfflineModeClient() {
         setSnapshot(loadedSnapshot);
         setStatus(loadedSnapshot ? "ready" : "empty");
       })
-      .catch(() => setStatus("error"));
+      .catch((error) => {
+        setLoadError(error instanceof Error ? error.message : "Unknown IndexedDB error");
+        setStatus("error");
+      });
 
     return () => {
       window.removeEventListener("online", handleOnline);
@@ -111,13 +136,22 @@ export function OfflineModeClient() {
   }
 
   const filteredVariants = useMemo(() => {
-    if (!snapshot) {
+    if (!snapshot || !Array.isArray(snapshot.variants)) {
       return [];
     }
 
     const normalizedQuery = query.trim().toLowerCase();
+    const setSlugExists =
+      view.name !== "set" || snapshot.sets.some((set) => set.slug === view.slug);
     return snapshot.variants.filter((variant) => {
-      if (view.name === "set" && variant.card.set.slug !== view.slug) {
+      const card = variant.card;
+      const set = card?.set;
+
+      if (!card || !set) {
+        return false;
+      }
+
+      if (view.name === "set" && setSlugExists && set.slug !== view.slug) {
         return false;
       }
 
@@ -126,12 +160,12 @@ export function OfflineModeClient() {
       }
 
       return [
-        variant.card.name,
-        variant.card.cardNumber,
-        variant.card.rarity,
-        variant.card.set.name,
+        card.name,
+        card.cardNumber,
+        card.rarity,
+        set.name,
         variant.notes,
-        ...variant.ownedItems.map((item) => item.notes),
+        ...(Array.isArray(variant.ownedItems) ? variant.ownedItems.map((item) => item.notes) : []),
       ]
         .join(" ")
         .toLowerCase()
@@ -139,10 +173,37 @@ export function OfflineModeClient() {
     });
   }, [query, snapshot, view]);
 
+  const debugInfo: OfflineDebugInfo = {
+    currentPath,
+    snapshotLoaded: Boolean(snapshot),
+    schemaVersion: snapshot ? String(snapshot.schemaVersion) : "-",
+    generatedAt: snapshot?.generatedAt ?? "-",
+    sets: snapshot?.counts?.sets ?? snapshot?.sets?.length ?? 0,
+    cards: snapshot?.counts?.cards ?? snapshot?.cards?.length ?? 0,
+    variants: snapshot?.counts?.variants ?? snapshot?.variants?.length ?? 0,
+    status,
+    error: loadError || undefined,
+  };
+
   if (status === "loading") {
     return (
       <section className="neon-panel rounded-lg p-6 text-slate-300">
         Loading offline snapshot...
+        <OfflineDebugPanel debugInfo={debugInfo} />
+      </section>
+    );
+  }
+
+  if (status === "error") {
+    return (
+      <section className="neon-panel rounded-lg p-6">
+        <p className="neon-eyebrow text-xs font-black uppercase tracking-widest">Offline card show mode</p>
+        <h1 className="mt-2 text-3xl font-black text-white">Offline snapshot unavailable</h1>
+        <p className="mt-3 max-w-2xl text-slate-400">
+          Offline snapshot unavailable. Open the app online once before using offline mode.
+        </p>
+        {loadError ? <p className="mt-3 text-sm text-amber-100">{loadError}</p> : null}
+        <OfflineDebugPanel debugInfo={debugInfo} />
       </section>
     );
   }
@@ -151,25 +212,25 @@ export function OfflineModeClient() {
     return (
       <section className="neon-panel rounded-lg p-6">
         <p className="neon-eyebrow text-xs font-black uppercase tracking-widest">Offline card show mode</p>
-        <h1 className="mt-2 text-3xl font-black text-white">No offline snapshot yet</h1>
+        <h1 className="mt-2 text-3xl font-black text-white">Offline snapshot unavailable</h1>
         <p className="mt-3 max-w-2xl text-slate-400">
-          Open the collection while online once, then this device will save a read-only snapshot for card show browsing.
+          Offline snapshot unavailable. Open the app online once before using offline mode.
         </p>
-      </section>
-    );
-  }
-
-  if (status === "error") {
-    return (
-      <section className="neon-panel rounded-lg p-6">
-        <h1 className="text-3xl font-black text-white">Offline snapshot unavailable</h1>
-        <p className="mt-3 text-slate-400">The saved snapshot could not be read on this device.</p>
+        <OfflineDebugPanel debugInfo={debugInfo} />
       </section>
     );
   }
 
   const selectedCard = view.name === "card" ? snapshot.variants.find((variant) => variant.id === view.id) : null;
   const selectedSet = view.name === "set" ? snapshot.sets.find((set) => set.slug === view.slug) : null;
+  const effectiveView: OfflineView =
+    (view.name === "card" && !selectedCard) || (view.name === "set" && !selectedSet)
+      ? { name: "cards" }
+      : view;
+  const routeFallbackMessage =
+    effectiveView !== view
+      ? "The cached snapshot could not match this route, so offline mode is showing the card list instead."
+      : "";
 
   return (
     <div className="space-y-6">
@@ -191,6 +252,12 @@ export function OfflineModeClient() {
             {blockedMessage}
           </p>
         ) : null}
+        {routeFallbackMessage ? (
+          <p className="mt-4 rounded-md border border-cyan-300/20 bg-cyan-300/10 px-3 py-2 text-sm font-bold text-cyan-100">
+            {routeFallbackMessage}
+          </p>
+        ) : null}
+        <OfflineDebugPanel debugInfo={debugInfo} />
         <div className="mt-5 flex flex-wrap gap-2">
           <button type="button" className="btn-secondary rounded-md px-3 py-2 text-xs font-black" onClick={() => navigate({ name: "dashboard" })}>
             Dashboard
@@ -204,17 +271,17 @@ export function OfflineModeClient() {
         </div>
       </section>
 
-      {view.name === "dashboard" ? (
+      {effectiveView.name === "dashboard" ? (
         <OfflineDashboard snapshot={snapshot} navigate={navigate} />
       ) : null}
 
-      {view.name === "sets" ? (
+      {effectiveView.name === "sets" ? (
         <OfflineSets snapshot={snapshot} navigate={navigate} />
       ) : null}
 
-      {view.name === "cards" || view.name === "set" ? (
+      {effectiveView.name === "cards" || effectiveView.name === "set" ? (
         <OfflineCards
-          title={selectedSet ? selectedSet.name : "All cards"}
+          title={effectiveView.name === "set" && selectedSet ? selectedSet.name : "All cards"}
           query={query}
           setQuery={setQuery}
           variants={filteredVariants}
@@ -223,7 +290,7 @@ export function OfflineModeClient() {
         />
       ) : null}
 
-      {view.name === "card" && selectedCard ? (
+      {effectiveView.name === "card" && selectedCard ? (
         <OfflineCardDetail variant={selectedCard} blockEdit={blockEdit} />
       ) : null}
     </div>
@@ -453,5 +520,53 @@ function OfflineStat({ label, value }: { label: string; value: string }) {
       <p className="text-sm font-semibold text-slate-400">{label}</p>
       <p className="mt-2 text-3xl font-black text-white">{value}</p>
     </section>
+  );
+}
+
+function OfflineDebugPanel({ debugInfo }: { debugInfo: OfflineDebugInfo }) {
+  return (
+    <details className="mt-4 rounded-md border border-white/[0.08] bg-slate-950/60 px-3 py-2 text-xs text-slate-400">
+      <summary className="cursor-pointer font-black uppercase tracking-widest text-slate-300">
+        Offline debug
+      </summary>
+      <dl className="mt-3 grid gap-2 sm:grid-cols-2">
+        <div>
+          <dt className="font-bold text-slate-500">Snapshot loaded</dt>
+          <dd>{debugInfo.snapshotLoaded ? "yes" : "no"}</dd>
+        </div>
+        <div>
+          <dt className="font-bold text-slate-500">Status</dt>
+          <dd>{debugInfo.status}</dd>
+        </div>
+        <div>
+          <dt className="font-bold text-slate-500">Schema version</dt>
+          <dd>{debugInfo.schemaVersion}</dd>
+        </div>
+        <div>
+          <dt className="font-bold text-slate-500">Generated at</dt>
+          <dd>{debugInfo.generatedAt}</dd>
+        </div>
+        <div>
+          <dt className="font-bold text-slate-500">Sets</dt>
+          <dd>{debugInfo.sets}</dd>
+        </div>
+        <div>
+          <dt className="font-bold text-slate-500">Cards / variants</dt>
+          <dd>
+            {debugInfo.cards} / {debugInfo.variants}
+          </dd>
+        </div>
+        <div className="sm:col-span-2">
+          <dt className="font-bold text-slate-500">Current path</dt>
+          <dd className="break-all">{debugInfo.currentPath}</dd>
+        </div>
+        {debugInfo.error ? (
+          <div className="sm:col-span-2">
+            <dt className="font-bold text-slate-500">Error</dt>
+            <dd className="break-all text-amber-100">{debugInfo.error}</dd>
+          </div>
+        ) : null}
+      </dl>
+    </details>
   );
 }
