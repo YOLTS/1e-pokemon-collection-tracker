@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import { OfflineRuntime } from "@/components/OfflineRuntime";
 import { PrimaryNav } from "@/components/PrimaryNav";
@@ -48,13 +47,14 @@ export default function RootLayout({
         <header className="sticky top-0 z-30 border-b border-cyan-300/15 bg-slate-950/[0.78] shadow-[0_10px_42px_rgba(0,0,0,0.32)] backdrop-blur-xl">
           <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
             <Link href="/" className="flex items-center gap-3">
-              <Image
+              {/* Use the direct public asset so the installed PWA header logo works offline. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
                 src="/logos/top_banner_logo.png"
                 alt=""
                 width={128}
                 height={128}
                 className="size-32 shrink-0 object-contain mix-blend-screen"
-                priority
               />
               <span>
                 <span className="block text-base font-black tracking-wide text-white">

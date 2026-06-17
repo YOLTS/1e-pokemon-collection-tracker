@@ -1,4 +1,4 @@
-const CACHE_NAME = "pokemon-tracker-shell-v3";
+const CACHE_NAME = "pokemon-tracker-shell-v4";
 const OFFLINE_URL = "/offline";
 const STATIC_ASSETS = [
   OFFLINE_URL,
@@ -9,6 +9,7 @@ const STATIC_ASSETS = [
   "/icons/apple-touch-icon.png?v=5",
   "/icons/favicon-32.png?v=5",
   "/logos/top_banner_logo.png",
+  "/backgrounds/neon_bg1.png",
 ];
 
 self.addEventListener("install", (event) => {
@@ -59,6 +60,7 @@ self.addEventListener("fetch", (event) => {
     (url.pathname.startsWith("/_next/static/") ||
       url.pathname.startsWith("/icons/") ||
       url.pathname.startsWith("/logos/") ||
+      url.pathname.startsWith("/backgrounds/") ||
       url.pathname === "/manifest.webmanifest")
   ) {
     event.respondWith(
