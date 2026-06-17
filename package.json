@@ -13,6 +13,7 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "neon:generate": "prisma generate --schema prisma/schema.postgres.prisma && prisma generate --schema prisma/schema.sqlite-source.prisma",
+    "neon:deploy:schema": "prisma migrate deploy --schema prisma/neon/schema.prisma",
     "neon:verify": "prisma generate --schema prisma/schema.sqlite-source.prisma && tsx scripts/verify-sqlite-neon-counts.ts",
     "neon:import": "prisma generate --schema prisma/schema.postgres.prisma && prisma generate --schema prisma/schema.sqlite-source.prisma && tsx scripts/import-sqlite-to-neon.ts",
     "prisma:seed": "prisma db seed",

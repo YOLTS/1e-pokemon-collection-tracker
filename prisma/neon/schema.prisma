@@ -1,0 +1,143 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/postgres-client"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("NEON_DATABASE_URL")
+  directUrl = env("NEON_DATABASE_URL_UNPOOLED")
+}
+
+model PokemonSet {
+  id           Int     @id @default(autoincrement())
+  name         String
+  slug         String  @unique
+  series       String
+  era          String  @default("WOTC_VINTAGE")
+  language     String  @default("ENGLISH")
+  releaseYear  Int
+  totalCards   Int
+  firstEdition Boolean @default(true)
+  symbol       String
+  symbolLabel  String
+  color        String
+  displayOrder Int
+  cards        Card[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([displayOrder])
+  @@index([era, language])
+}
+
+model Card {
+  id               Int           @id @default(autoincrement())
+  setId            Int
+  set              PokemonSet    @relation(fields: [setId], references: [id], onDelete: Cascade)
+  cardNumber       String
+  name             String
+  rarity           String
+  category         String        @default("POKEMON")
+  displayOrder     Int
+  artist           String?
+  imageUrlSmall    String?
+  imageUrlLarge    String?
+  imageSource      String?
+  imageMatchStatus String        @default("UNMATCHED")
+  variants         CardVariant[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([setId, cardNumber, name])
+  @@index([setId])
+  @@index([setId, displayOrder])
+  @@index([imageMatchStatus])
+}
+
+model CardVariant {
+  id                   Int              @id @default(autoincrement())
+  cardId               Int
+  card                 Card             @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  slug                 String           @unique
+  edition              String           @default("FIRST_EDITION")
+  finish               String           @default("NON_HOLO")
+  language             String           @default("ENGLISH")
+  isMasterSetCandidate Boolean          @default(true)
+  estimatedValue       Float            @default(0)
+  targetBuyPrice       Float?
+  marketPrice          Float?
+  marketPriceSource    String?
+  marketPriceStatus    String           @default("UNAVAILABLE")
+  marketPriceBucket    String?
+  marketPriceUpdatedAt DateTime?
+  notes                String           @default("")
+  ownedItems           CollectionItem[]
+  priceSnapshots       PriceSnapshot[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([cardId])
+  @@index([edition, finish, language])
+  @@index([isMasterSetCandidate])
+  @@index([marketPriceStatus])
+}
+
+model CollectionItem {
+  id                Int          @id @default(autoincrement())
+  variantId         Int
+  variant           CardVariant  @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  status            String       @default("OWNED")
+  condition         String       @default("NOT_ASSESSED")
+  gradingCompany    String       @default("RAW")
+  grade             String?
+  purchasePrice     Float?
+  acquiredAt        DateTime?
+  acquisitionSource String       @default("UNKNOWN")
+  storageLocation   String       @default("Binder")
+  notes             String       @default("")
+  isPrimaryCopy     Boolean      @default(true)
+  saleRecords       SaleRecord[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([variantId])
+  @@index([status])
+  @@index([gradingCompany])
+}
+
+model PriceSnapshot {
+  id          Int         @id @default(autoincrement())
+  variantId   Int
+  variant     CardVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  source      String      @default("MANUAL")
+  marketPrice Float
+  lowPrice    Float?
+  highPrice   Float?
+  capturedAt  DateTime    @default(now())
+  notes       String      @default("")
+
+  @@index([variantId])
+  @@index([source])
+  @@index([capturedAt])
+}
+
+model SaleRecord {
+  id               Int            @id @default(autoincrement())
+  collectionItemId Int
+  collectionItem   CollectionItem @relation(fields: [collectionItemId], references: [id], onDelete: Cascade)
+  soldPrice        Float
+  soldAt           DateTime
+  marketplace      String         @default("Unknown")
+  fees             Float          @default(0)
+  notes            String         @default("")
+
+  createdAt DateTime @default(now())
+
+  @@index([collectionItemId])
+  @@index([soldAt])
+}
