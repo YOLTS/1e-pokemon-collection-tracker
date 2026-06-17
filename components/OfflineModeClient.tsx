@@ -174,7 +174,7 @@ export function OfflineModeClient() {
   }
 
   function blockEdit() {
-    setBlockedMessage("Connection required. Offline card show mode is read-only.");
+    setBlockedMessage("Connect to edit. Viewing local collection data.");
   }
 
   const filteredVariants = useMemo(() => {
