@@ -1,5 +1,5 @@
 import type { CardVariant, CollectionItem } from "@prisma/client";
-import { OWNERSHIP_STATUS } from "@/lib/domain";
+import { OWNERSHIP_STATUS, PRICE_SOURCE } from "@/lib/domain";
 
 export type VariantWithOwnership = CardVariant & {
   ownedItems: CollectionItem[];
@@ -17,26 +17,30 @@ export function getPrimaryCopy(variant: VariantWithOwnership) {
   );
 }
 
-export function getProvisionalMarketPrice(variant: Pick<CardVariant, "marketPrice" | "marketPriceStatus">) {
-  return variant.marketPriceStatus === "EXACT_1ST_EDITION" && variant.marketPrice !== null
-    ? variant.marketPrice
-    : null;
+export function getMarketPrice(
+  variant: Pick<CardVariant, "estimatedValue" | "marketPrice" | "marketPriceSource">,
+) {
+  if (variant.marketPriceSource === PRICE_SOURCE.MANUAL_SPREADSHEET && variant.marketPrice !== null) {
+    return variant.marketPrice;
+  }
+
+  return variant.estimatedValue > 0 ? variant.estimatedValue : null;
 }
 
 export function summarizeVariants(variants: VariantWithOwnership[]) {
   const masterVariants = variants.filter((variant) => variant.isMasterSetCandidate);
   const ownedVariants = masterVariants.filter(hasOwnedCopy);
   const missingVariants = masterVariants.filter((variant) => !hasOwnedCopy(variant));
-  const pricedVariants = masterVariants.filter((variant) => getProvisionalMarketPrice(variant) !== null);
-  const pricedOwnedVariants = ownedVariants.filter((variant) => getProvisionalMarketPrice(variant) !== null);
-  const pricedMissingVariants = missingVariants.filter((variant) => getProvisionalMarketPrice(variant) !== null);
+  const pricedVariants = masterVariants.filter((variant) => getMarketPrice(variant) !== null);
+  const pricedOwnedVariants = ownedVariants.filter((variant) => getMarketPrice(variant) !== null);
+  const pricedMissingVariants = missingVariants.filter((variant) => getMarketPrice(variant) !== null);
 
   const estimatedCollectionValue = ownedVariants.reduce(
-    (total, variant) => total + (getProvisionalMarketPrice(variant) ?? 0),
+    (total, variant) => total + (getMarketPrice(variant) ?? 0),
     0,
   );
   const estimatedRemainingCost = missingVariants.reduce(
-    (total, variant) => total + (getProvisionalMarketPrice(variant) ?? 0),
+    (total, variant) => total + (getMarketPrice(variant) ?? 0),
     0,
   );
 

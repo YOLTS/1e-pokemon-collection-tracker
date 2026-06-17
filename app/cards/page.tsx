@@ -3,7 +3,7 @@ import { unstable_noStore as noStore } from "next/cache";
 import { RarityIntelligence } from "@/components/CollectionIntelligence";
 import { StatCard } from "@/components/StatCard";
 import { VariantTable } from "@/components/VariantTable";
-import { summarizeVariants } from "@/lib/collection";
+import { getMarketPrice, summarizeVariants } from "@/lib/collection";
 import { formatCurrency } from "@/lib/format";
 import { buildRarityIntelligence } from "@/lib/collection-intelligence";
 import { prisma } from "@/lib/prisma";
@@ -41,12 +41,6 @@ export default async function CardsPage({ searchParams }: CardsPageProps) {
     ],
     include: {
       ownedItems: true,
-      priceSnapshots: {
-        where: { source: "POKEMON_TCG_API_TCGPLAYER" },
-        orderBy: { capturedAt: "desc" },
-        take: 1,
-        select: { marketPrice: true, source: true, capturedAt: true },
-      },
       card: {
         include: {
           set: {
@@ -64,18 +58,16 @@ export default async function CardsPage({ searchParams }: CardsPageProps) {
 
   const summary = summarizeVariants(variants);
   const rarityIntelligence = buildRarityIntelligence(variants);
-  const pricedVariants = variants.filter(
-    (variant) => variant.priceSnapshots[0]?.source === "POKEMON_TCG_API_TCGPLAYER",
-  );
+  const pricedVariants = variants.filter((variant) => getMarketPrice(variant) !== null);
   const highestPricedVariant = [...pricedVariants].sort(
-    (a, b) => (b.priceSnapshots[0]?.marketPrice ?? 0) - (a.priceSnapshots[0]?.marketPrice ?? 0),
+    (a, b) => (getMarketPrice(b) ?? 0) - (getMarketPrice(a) ?? 0),
   )[0];
   const pricingDebug = {
     pricedCards: pricedVariants.length,
     highestPricedCard: highestPricedVariant
       ? `${highestPricedVariant.card.name} (${highestPricedVariant.card.set.name})`
       : null,
-    highestPricedValue: highestPricedVariant?.priceSnapshots[0]?.marketPrice ?? null,
+    highestPricedValue: highestPricedVariant ? getMarketPrice(highestPricedVariant) : null,
   };
 
   return (

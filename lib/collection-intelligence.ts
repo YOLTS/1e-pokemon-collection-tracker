@@ -1,10 +1,12 @@
 import { compareRarity, rarityRank } from "@/lib/rarity";
+import { getMarketPrice } from "@/lib/collection";
 
 type IntelligenceVariant = {
   id: number;
+  estimatedValue: number;
   isMasterSetCandidate: boolean;
   marketPrice: number | null;
-  marketPriceStatus: string;
+  marketPriceSource: string | null;
   ownedItems: Array<{ status: string }>;
   card: {
     name: string;
@@ -76,7 +78,7 @@ export function buildCollectionIntelligence(
     .sort(
       (a, b) =>
         rarityRank(a.card.rarity) - rarityRank(b.card.rarity) ||
-        (b.marketPrice ?? -1) - (a.marketPrice ?? -1) ||
+        (getMarketPrice(b) ?? -1) - (getMarketPrice(a) ?? -1) ||
         a.card.name.localeCompare(b.card.name),
     )
     .slice(0, 3)
@@ -87,8 +89,7 @@ export function buildCollectionIntelligence(
       rarity: variant.card.rarity,
       setName: variant.card.set.name,
       setSlug: variant.card.set.slug,
-      marketPrice:
-        variant.marketPriceStatus === "EXACT_1ST_EDITION" ? variant.marketPrice : null,
+      marketPrice: getMarketPrice(variant),
     }));
 
   return {

@@ -31,12 +31,6 @@ export default async function SetDetailPage({ params }: SetDetailPageProps) {
             orderBy: { id: "asc" },
             include: {
               ownedItems: true,
-              priceSnapshots: {
-                where: { source: "POKEMON_TCG_API_TCGPLAYER" },
-                orderBy: { capturedAt: "desc" },
-                take: 1,
-                select: { marketPrice: true, source: true, capturedAt: true },
-              },
               card: {
                 include: { set: { select: { name: true, slug: true, symbol: true, color: true } } },
               },

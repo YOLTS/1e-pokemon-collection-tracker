@@ -14,6 +14,8 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "prisma db seed",
     "images:match": "tsx scripts/match-card-images.ts",
+    "prices:import:manual:dry": "tsx scripts/import-manual-prices.ts --dry-run",
+    "prices:import:manual": "tsx scripts/import-manual-prices.ts --apply",
     "prices:sync": "tsx scripts/sync-card-prices.ts"
   },
   "dependencies": {

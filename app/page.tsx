@@ -4,7 +4,7 @@ import { CollectionIntelligence } from "@/components/CollectionIntelligence";
 import { ProgressDonut } from "@/components/ProgressDonut";
 import { SetProgressCard } from "@/components/SetProgressCard";
 import { StatCard } from "@/components/StatCard";
-import { formatEnumLabel, summarizeVariants } from "@/lib/collection";
+import { formatEnumLabel, getMarketPrice, summarizeVariants } from "@/lib/collection";
 import { formatCurrency, formatMarketPrice } from "@/lib/format";
 import { buildCollectionIntelligence } from "@/lib/collection-intelligence";
 import { prisma } from "@/lib/prisma";
@@ -152,7 +152,7 @@ export default async function DashboardPage() {
                   </div>
                   <div className="flex items-center justify-between gap-3 border-t border-white/10 pt-3 text-sm normal-case tracking-normal text-slate-400">
                     <span>{summary.pricedVariants} / {summary.totalVariants} cards priced</span>
-                    <span className="font-bold text-cyan-100/80">Exact 1st Edition TCGplayer market</span>
+                    <span className="font-bold text-cyan-100/80">Manual spreadsheet price</span>
                   </div>
                 </dl>
               </div>
@@ -246,7 +246,7 @@ export default async function DashboardPage() {
                 </div>
                 <p className="mt-3 text-sm text-slate-400">
                   {formatEnumLabel(item.condition)} - {formatMarketPrice(
-                    item.variant.marketPriceStatus === "EXACT_1ST_EDITION" ? item.variant.marketPrice : null,
+                    getMarketPrice(item.variant),
                   )}
                 </p>
               </div>

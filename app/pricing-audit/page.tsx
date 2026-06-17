@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { unstable_noStore as noStore } from "next/cache";
+import { getMarketPrice } from "@/lib/collection";
+import { PRICE_SOURCE } from "@/lib/domain";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
-const priceSource = "POKEMON_TCG_API_TCGPLAYER";
+const priceSource = PRICE_SOURCE.MANUAL_SPREADSHEET;
 
 function formatAuditCurrency(value: number) {
   return new Intl.NumberFormat("en-US", {
@@ -16,7 +18,7 @@ function formatAuditCurrency(value: number) {
 }
 
 function formatSource(source: string) {
-  return source === priceSource ? "Pokemon TCG API / TCGplayer" : source;
+  return source === priceSource ? "Manual spreadsheet price" : source;
 }
 
 export default async function PricingAuditPage() {
@@ -24,7 +26,7 @@ export default async function PricingAuditPage() {
 
   const variants = await prisma.cardVariant.findMany({
     where: {
-      marketPriceStatus: "EXACT_1ST_EDITION",
+      marketPriceSource: priceSource,
       marketPrice: { not: null },
     },
     include: {
@@ -39,24 +41,24 @@ export default async function PricingAuditPage() {
 
   const pricedCards = variants
     .flatMap((variant) => {
-      const snapshot = variant.priceSnapshots[0];
-      if (!snapshot) return [];
-      return [{ variant, snapshot }];
+      const price = getMarketPrice(variant);
+      if (price === null) return [];
+      return [{ variant, snapshot: variant.priceSnapshots[0], price }];
     })
-    .sort((a, b) => b.snapshot.marketPrice - a.snapshot.marketPrice);
+    .sort((a, b) => b.price - a.price);
 
   const highest = pricedCards[0] ?? null;
   const median = pricedCards[Math.floor(pricedCards.length / 2)] ?? null;
-  const totalValue = pricedCards.reduce((total, entry) => total + entry.snapshot.marketPrice, 0);
+  const totalValue = pricedCards.reduce((total, entry) => total + entry.price, 0);
 
   return (
     <div className="space-y-6">
       <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="neon-eyebrow text-sm font-bold uppercase tracking-widest">Temporary pricing review</p>
-          <h1 className="mt-2 text-4xl font-black text-white">Provisional pricing audit</h1>
+          <p className="neon-eyebrow text-sm font-bold uppercase tracking-widest">Manual pricing review</p>
+          <h1 className="mt-2 text-4xl font-black text-white">Manual spreadsheet pricing audit</h1>
           <p className="mt-3 max-w-3xl text-slate-400">
-            Exact 1st Edition Pokémon TCG API pricing snapshots only. Generic pricing buckets are excluded.
+            Manual spreadsheet pricing snapshots imported from your tracker workbook.
           </p>
           <div className="neon-divider mt-5 max-w-xl" />
         </div>
@@ -69,17 +71,17 @@ export default async function PricingAuditPage() {
         <div className="neon-panel rounded-lg p-4">
           <p className="text-xs font-black uppercase tracking-widest text-slate-500">Highest priced card</p>
           <p className="mt-2 text-xl font-black text-white">{highest?.variant.card.name ?? "Unavailable"}</p>
-          <p className="mt-1 text-sm font-bold text-amber-100">{highest ? formatAuditCurrency(highest.snapshot.marketPrice) : "-"}</p>
+          <p className="mt-1 text-sm font-bold text-amber-100">{highest ? formatAuditCurrency(highest.price) : "-"}</p>
         </div>
         <div className="neon-panel rounded-lg p-4">
           <p className="text-xs font-black uppercase tracking-widest text-slate-500">Median priced card</p>
           <p className="mt-2 text-xl font-black text-white">{median?.variant.card.name ?? "Unavailable"}</p>
-          <p className="mt-1 text-sm font-bold text-cyan-100">{median ? formatAuditCurrency(median.snapshot.marketPrice) : "-"}</p>
+          <p className="mt-1 text-sm font-bold text-cyan-100">{median ? formatAuditCurrency(median.price) : "-"}</p>
         </div>
         <div className="neon-panel rounded-lg p-4">
           <p className="text-xs font-black uppercase tracking-widest text-slate-500">Total priced cards</p>
           <p className="mt-2 text-3xl font-black text-white">{pricedCards.length}</p>
-          <p className="mt-1 text-sm text-slate-500">Exact 1st Edition snapshots</p>
+          <p className="mt-1 text-sm text-slate-500">Manual spreadsheet snapshots</p>
         </div>
         <div className="neon-panel rounded-lg p-4">
           <p className="text-xs font-black uppercase tracking-widest text-slate-500">Sum of priced cards</p>
@@ -101,11 +103,11 @@ export default async function PricingAuditPage() {
                 <th>Number</th>
                 <th className="text-right">Market value</th>
                 <th>Price source</th>
-                <th>Price bucket used</th>
+                <th>Price type</th>
               </tr>
             </thead>
             <tbody>
-              {pricedCards.map(({ variant, snapshot }) => (
+              {pricedCards.map(({ variant, snapshot, price }) => (
                 <tr key={variant.id}>
                   <td>
                     <Link href={`/cards/${variant.id}`} className="font-black text-white transition hover:text-cyan-200">
@@ -114,11 +116,11 @@ export default async function PricingAuditPage() {
                   </td>
                   <td className="text-slate-300">{variant.card.set.name}</td>
                   <td className="font-mono text-slate-400">{variant.card.cardNumber}</td>
-                  <td className="text-right font-black text-amber-100">{formatAuditCurrency(snapshot.marketPrice)}</td>
-                  <td className="text-slate-400">{formatSource(snapshot.source)}</td>
+                  <td className="text-right font-black text-amber-100">{formatAuditCurrency(price)}</td>
+                  <td className="text-slate-400">{formatSource(snapshot?.source ?? variant.marketPriceSource ?? "Manual")}</td>
                   <td>
                     <span className="rounded-md border border-cyan-300/15 bg-cyan-300/[0.06] px-2 py-1 font-mono text-xs font-bold text-cyan-100/80">
-                      {variant.marketPriceBucket ?? "Unavailable"}
+                      Manual spreadsheet
                     </span>
                   </td>
                 </tr>
@@ -130,3 +132,4 @@ export default async function PricingAuditPage() {
     </div>
   );
 }
+

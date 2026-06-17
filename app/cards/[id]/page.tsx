@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { updateVariantDetails } from "@/app/actions";
 import { CardArtwork } from "@/components/CardArtwork";
 import { CARD_CONDITION } from "@/lib/domain";
-import { formatEnumLabel, getPrimaryCopy, hasOwnedCopy } from "@/lib/collection";
+import { formatEnumLabel, getMarketPrice, getPrimaryCopy, hasOwnedCopy } from "@/lib/collection";
 import { formatCurrency, formatMarketPrice } from "@/lib/format";
 import { rarityToken } from "@/lib/rarity";
 import { prisma } from "@/lib/prisma";
@@ -133,7 +133,7 @@ export default async function CardDetailPage({ params, searchParams }: CardDetai
             <div><dt>Grading</dt><dd>{gradingLabel}</dd></div>
             <div>
               <dt>Estimated market value</dt>
-              <dd>{formatMarketPrice(variant.marketPriceStatus === "EXACT_1ST_EDITION" ? variant.marketPrice : null)}</dd>
+              <dd>{formatMarketPrice(getMarketPrice(variant))}</dd>
             </div>
             <div><dt>Acquisition cost</dt><dd>{primaryCopy?.purchasePrice ? formatCurrency(primaryCopy.purchasePrice) : "Not recorded"}</dd></div>
           </dl>

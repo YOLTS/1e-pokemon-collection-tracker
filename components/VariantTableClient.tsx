@@ -7,6 +7,8 @@ import { formatCurrency, formatMarketPrice } from "@/lib/format";
 import { compareRarity, rarityToken } from "@/lib/rarity";
 import type { PricingDebugSummary } from "@/components/VariantTable";
 
+const manualSpreadsheetSource = "MANUAL_SPREADSHEET";
+
 type OwnedItemRow = {
   id: number;
   status: string;
@@ -25,7 +27,7 @@ type VariantRow = {
   finish: string;
   estimatedValue: number;
   marketPrice: number | null;
-  marketPriceStatus: string;
+  marketPriceSource: string | null;
   priceSnapshots?: Array<{
     marketPrice: number;
     source: string;
@@ -77,13 +79,12 @@ function getPrimaryCopy(variant: VariantRow) {
   );
 }
 
-function provisionalPrice(variant: VariantRow) {
-  const snapshot = variant.priceSnapshots?.[0];
-  if (snapshot?.source === "POKEMON_TCG_API_TCGPLAYER") {
-    return snapshot.marketPrice;
+function marketPrice(variant: VariantRow) {
+  if (variant.marketPriceSource === manualSpreadsheetSource && variant.marketPrice !== null) {
+    return variant.marketPrice;
   }
 
-  return variant.marketPriceStatus === "EXACT_1ST_EDITION" ? variant.marketPrice : null;
+  return variant.estimatedValue > 0 ? variant.estimatedValue : null;
 }
 
 function formatEnumLabel(value?: string | null) {
@@ -157,8 +158,8 @@ export function VariantTableClient({
         }
 
         if (sortKey === "value") {
-          const aPrice = provisionalPrice(a);
-          const bPrice = provisionalPrice(b);
+          const aPrice = marketPrice(a);
+          const bPrice = marketPrice(b);
           if (aPrice === null && bPrice !== null) return 1;
           if (aPrice !== null && bPrice === null) return -1;
           if (aPrice !== null && bPrice !== null) return bPrice - aPrice;
@@ -188,9 +189,9 @@ export function VariantTableClient({
             </p>
             {pricingDebug ? (
               <p className="mt-2 text-xs font-semibold text-amber-100/75">
-                Pricing debug: {pricingDebug.pricedCards} priced · Highest {pricingDebug.highestPricedCard ?? "Unavailable"} · {formatMarketPrice(pricingDebug.highestPricedValue)} ·{" "}
+                Manual pricing: {pricingDebug.pricedCards} priced · Highest {pricingDebug.highestPricedCard ?? "Unavailable"} · {formatMarketPrice(pricingDebug.highestPricedValue)} ·{" "}
                 <Link href="/pricing-audit" className="text-cyan-200 underline decoration-cyan-300/30 underline-offset-2 hover:text-white">
-                  Review all prices
+                  Review manual prices
                 </Link>
               </p>
             ) : null}
@@ -253,7 +254,7 @@ export function VariantTableClient({
       <div className="collection-grid grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3">
         {filteredVariants.map((variant) => {
           const owned = hasOwnedCopy(variant);
-          const marketPrice = provisionalPrice(variant);
+          const canonicalMarketPrice = marketPrice(variant);
           const primaryCopy = getPrimaryCopy(variant);
           const notes = primaryCopy?.notes || variant.notes;
 
@@ -325,8 +326,8 @@ export function VariantTableClient({
                 </div>
                 <div>
                   <dt className="text-[10px] font-black uppercase tracking-wide text-slate-600">Market</dt>
-                  <dd className={`mt-1 font-black ${variant.marketPriceStatus === "EXACT_1ST_EDITION" ? "text-white" : "text-slate-600"}`}>
-                    {formatMarketPrice(marketPrice)}
+                  <dd className={`mt-1 font-black ${canonicalMarketPrice !== null ? "text-white" : "text-slate-600"}`}>
+                    {formatMarketPrice(canonicalMarketPrice)}
                   </dd>
                 </div>
                 <div>
