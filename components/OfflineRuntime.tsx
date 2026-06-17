@@ -4,6 +4,25 @@ import { useEffect } from "react";
 import { fetchAndSaveOfflineSnapshot } from "@/lib/offline-storage";
 
 let offlineShellWarmed = false;
+const serviceWorkerReloadFlag = "pokemonServiceWorkerControlReloaded";
+const serviceWorkerDebugKey = "pokemonServiceWorkerDebug";
+
+function writeServiceWorkerDebug(extra: Record<string, unknown>) {
+  try {
+    window.localStorage.setItem(
+      serviceWorkerDebugKey,
+      JSON.stringify({
+        checkedAt: new Date().toISOString(),
+        supported: "serviceWorker" in navigator,
+        controlled: Boolean(navigator.serviceWorker?.controller),
+        controllerScriptURL: navigator.serviceWorker?.controller?.scriptURL ?? null,
+        ...extra,
+      }),
+    );
+  } catch {
+    // Service worker diagnostics are best-effort only.
+  }
+}
 
 function warmOfflineShell() {
   if (offlineShellWarmed || typeof document === "undefined") {
@@ -33,12 +52,46 @@ function warmOfflineShell() {
 export function OfflineRuntime() {
   useEffect(() => {
     if (!("serviceWorker" in navigator)) {
+      writeServiceWorkerDebug({ supported: false });
       return;
     }
 
-    navigator.serviceWorker.register("/sw.js").catch((error) => {
-      console.warn("Service worker registration failed.", error);
-    });
+    let cancelled = false;
+
+    async function registerServiceWorker() {
+      try {
+        const registration = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+        await navigator.serviceWorker.ready;
+
+        if (cancelled) {
+          return;
+        }
+
+        writeServiceWorkerDebug({
+          scope: registration.scope,
+          activeState: registration.active?.state ?? null,
+          installingState: registration.installing?.state ?? null,
+          waitingState: registration.waiting?.state ?? null,
+        });
+      } catch (error) {
+        writeServiceWorkerDebug({
+          error: error instanceof Error ? error.message : "Unknown service worker registration error",
+        });
+        console.warn("Service worker registration failed.", error);
+      }
+    }
+
+    function handleControllerChange() {
+      writeServiceWorkerDebug({ event: "controllerchange" });
+    }
+
+    navigator.serviceWorker.addEventListener("controllerchange", handleControllerChange);
+    registerServiceWorker();
+
+    return () => {
+      cancelled = true;
+      navigator.serviceWorker.removeEventListener("controllerchange", handleControllerChange);
+    };
   }, []);
 
   useEffect(() => {
@@ -67,6 +120,17 @@ export function OfflineRuntime() {
           // Snapshot storage in IndexedDB succeeded; local debug metadata is optional.
         }
         warmOfflineShell();
+        if (
+          "serviceWorker" in navigator &&
+          !navigator.serviceWorker.controller &&
+          window.localStorage.getItem(serviceWorkerReloadFlag) !== "true"
+        ) {
+          writeServiceWorkerDebug({ action: "reload-to-claim-control" });
+          window.localStorage.setItem(serviceWorkerReloadFlag, "true");
+          window.location.reload();
+          return;
+        }
+        writeServiceWorkerDebug({ action: "snapshot-saved", snapshotGeneratedAt: snapshot.generatedAt });
       } catch (error) {
         console.warn("Offline snapshot refresh failed.", error);
       }

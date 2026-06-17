@@ -30,6 +30,8 @@ type OfflineDebugInfo = {
   cards: number;
   variants: number;
   status: OfflineLoadStatus;
+  serviceWorkerControlled: boolean;
+  serviceWorkerDebug: string;
   error?: string;
 };
 
@@ -93,11 +95,19 @@ export function OfflineModeClient() {
   const [blockedMessage, setBlockedMessage] = useState("");
   const [currentPath, setCurrentPath] = useState("/");
   const [loadError, setLoadError] = useState("");
+  const [serviceWorkerDebug, setServiceWorkerDebug] = useState("");
+  const [serviceWorkerControlled, setServiceWorkerControlled] = useState(false);
 
   useEffect(() => {
     setCurrentPath(window.location.pathname);
     setView(initialView());
     setOnline(navigator.onLine);
+    setServiceWorkerControlled(Boolean(navigator.serviceWorker?.controller));
+    try {
+      setServiceWorkerDebug(window.localStorage.getItem("pokemonServiceWorkerDebug") ?? "");
+    } catch {
+      setServiceWorkerDebug("Service worker debug storage unavailable.");
+    }
 
     function handleOnline() {
       setOnline(true);
@@ -109,6 +119,17 @@ export function OfflineModeClient() {
 
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
+
+    function handleControllerChange() {
+      setServiceWorkerControlled(Boolean(navigator.serviceWorker?.controller));
+      try {
+        setServiceWorkerDebug(window.localStorage.getItem("pokemonServiceWorkerDebug") ?? "");
+      } catch {
+        setServiceWorkerDebug("Service worker debug storage unavailable.");
+      }
+    }
+
+    navigator.serviceWorker?.addEventListener("controllerchange", handleControllerChange);
 
     loadOfflineSnapshot()
       .then((loadedSnapshot) => {
@@ -123,6 +144,7 @@ export function OfflineModeClient() {
     return () => {
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
+      navigator.serviceWorker?.removeEventListener("controllerchange", handleControllerChange);
     };
   }, []);
 
@@ -182,6 +204,8 @@ export function OfflineModeClient() {
     cards: snapshot?.counts?.cards ?? snapshot?.cards?.length ?? 0,
     variants: snapshot?.counts?.variants ?? snapshot?.variants?.length ?? 0,
     status,
+    serviceWorkerControlled,
+    serviceWorkerDebug,
     error: loadError || undefined,
   };
 
@@ -539,6 +563,10 @@ function OfflineDebugPanel({ debugInfo }: { debugInfo: OfflineDebugInfo }) {
           <dd>{debugInfo.status}</dd>
         </div>
         <div>
+          <dt className="font-bold text-slate-500">SW controlled</dt>
+          <dd>{debugInfo.serviceWorkerControlled ? "yes" : "no"}</dd>
+        </div>
+        <div>
           <dt className="font-bold text-slate-500">Schema version</dt>
           <dd>{debugInfo.schemaVersion}</dd>
         </div>
@@ -560,6 +588,12 @@ function OfflineDebugPanel({ debugInfo }: { debugInfo: OfflineDebugInfo }) {
           <dt className="font-bold text-slate-500">Current path</dt>
           <dd className="break-all">{debugInfo.currentPath}</dd>
         </div>
+        {debugInfo.serviceWorkerDebug ? (
+          <div className="sm:col-span-2">
+            <dt className="font-bold text-slate-500">SW debug</dt>
+            <dd className="break-all">{debugInfo.serviceWorkerDebug}</dd>
+          </div>
+        ) : null}
         {debugInfo.error ? (
           <div className="sm:col-span-2">
             <dt className="font-bold text-slate-500">Error</dt>
