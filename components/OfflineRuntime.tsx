@@ -49,6 +49,32 @@ function warmOfflineShell() {
   document.body.appendChild(iframe);
 }
 
+function offlineUrlFor(pathname: string, search: string) {
+  const cardMatch = pathname.match(/^\/cards\/(\d+)\/?$/);
+  if (cardMatch) {
+    return `/offline?card=${encodeURIComponent(cardMatch[1])}`;
+  }
+
+  if (pathname === "/cards" || pathname === "/cards/") {
+    return "/offline?view=cards";
+  }
+
+  const setMatch = pathname.match(/^\/sets\/([^/]+)\/?$/);
+  if (setMatch) {
+    return `/offline?set=${encodeURIComponent(decodeURIComponent(setMatch[1]))}`;
+  }
+
+  if (pathname === "/sets" || pathname === "/sets/") {
+    return "/offline?view=sets";
+  }
+
+  if (pathname === "/" || pathname === "/offline" || pathname === "/offline/") {
+    return `/offline${search}`;
+  }
+
+  return null;
+}
+
 export function OfflineRuntime() {
   useEffect(() => {
     if (!("serviceWorker" in navigator)) {
@@ -142,6 +168,43 @@ export function OfflineRuntime() {
     return () => {
       cancelled = true;
       window.removeEventListener("online", refreshSnapshot);
+    };
+  }, []);
+
+  useEffect(() => {
+    function handleOfflineNavigation(event: MouseEvent) {
+      if (navigator.onLine || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+        return;
+      }
+
+      const target = event.target;
+      if (!(target instanceof Element)) {
+        return;
+      }
+
+      const link = target.closest("a[href]");
+      if (!(link instanceof HTMLAnchorElement)) {
+        return;
+      }
+
+      const url = new URL(link.href, window.location.href);
+      if (url.origin !== window.location.origin) {
+        return;
+      }
+
+      const offlineUrl = offlineUrlFor(url.pathname, url.search);
+      if (!offlineUrl) {
+        return;
+      }
+
+      event.preventDefault();
+      window.location.assign(offlineUrl);
+    }
+
+    document.addEventListener("click", handleOfflineNavigation, true);
+
+    return () => {
+      document.removeEventListener("click", handleOfflineNavigation, true);
     };
   }, []);
 

@@ -64,6 +64,26 @@ function initialView(): OfflineView {
     return { name: "dashboard" };
   }
 
+  const params = new URLSearchParams(window.location.search);
+  const cardId = Number(params.get("card"));
+  if (Number.isInteger(cardId) && cardId > 0) {
+    return { name: "card", id: cardId };
+  }
+
+  const setSlug = params.get("set");
+  if (setSlug) {
+    return { name: "set", slug: setSlug };
+  }
+
+  const view = params.get("view");
+  if (view === "cards") {
+    return { name: "cards" };
+  }
+
+  if (view === "sets") {
+    return { name: "sets" };
+  }
+
   const path = window.location.pathname;
   const cardMatch = path.match(/^\/cards\/(\d+)/);
   if (cardMatch) {
