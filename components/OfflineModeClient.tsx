@@ -278,17 +278,25 @@ export function OfflineModeClient() {
 
   return (
     <div className="space-y-6">
-      <section className="neon-panel rounded-lg p-5">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <p className="neon-eyebrow text-xs font-black uppercase tracking-widest">Offline card show mode</p>
-            <h1 className="mt-1 text-3xl font-black text-white">Cached collection snapshot</h1>
-            <p className="mt-2 text-sm text-slate-400">
-              Showing read-only data cached {formatTimestamp(snapshot.generatedAt)}. Live edits require a connection.
-            </p>
+      <section className="neon-panel rounded-lg px-4 py-3">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <span className={`rounded-full border px-3 py-1 font-black ${online ? "border-emerald-300/25 bg-emerald-300/10 text-emerald-100" : "border-cyan-300/25 bg-cyan-300/10 text-cyan-100"}`}>
+              Local data
+            </span>
+            <span className="font-semibold text-slate-300">Last synced {formatTimestamp(snapshot.generatedAt)}</span>
+            <span className="text-slate-500">Read-only until connection is available.</span>
           </div>
-          <div className={`rounded-md border px-3 py-2 text-sm font-black ${online ? "border-emerald-300/25 bg-emerald-300/10 text-emerald-100" : "border-amber-300/30 bg-amber-300/10 text-amber-100"}`}>
-            {online ? "Online available" : "Offline snapshot"}
+          <div className="flex flex-wrap gap-2">
+            <button type="button" className="btn-secondary rounded-md px-3 py-2 text-xs font-black" onClick={() => navigate({ name: "dashboard" })}>
+              Dashboard
+            </button>
+            <button type="button" className="btn-secondary rounded-md px-3 py-2 text-xs font-black" onClick={() => navigate({ name: "sets" })}>
+              Sets
+            </button>
+            <button type="button" className="btn-secondary rounded-md px-3 py-2 text-xs font-black" onClick={() => navigate({ name: "cards" })}>
+              Cards
+            </button>
           </div>
         </div>
         {blockedMessage ? (
@@ -302,17 +310,6 @@ export function OfflineModeClient() {
           </p>
         ) : null}
         <OfflineDebugPanel debugInfo={debugInfo} />
-        <div className="mt-5 flex flex-wrap gap-2">
-          <button type="button" className="btn-secondary rounded-md px-3 py-2 text-xs font-black" onClick={() => navigate({ name: "dashboard" })}>
-            Dashboard
-          </button>
-          <button type="button" className="btn-secondary rounded-md px-3 py-2 text-xs font-black" onClick={() => navigate({ name: "sets" })}>
-            Sets
-          </button>
-          <button type="button" className="btn-secondary rounded-md px-3 py-2 text-xs font-black" onClick={() => navigate({ name: "cards" })}>
-            Cards
-          </button>
-        </div>
       </section>
 
       {effectiveView.name === "dashboard" ? (
