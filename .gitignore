@@ -7,4 +7,5 @@ tsconfig.tsbuildinfo
 .next-dev.err.log
 imports/*
 !imports/.gitkeep
+prisma/generated
 
