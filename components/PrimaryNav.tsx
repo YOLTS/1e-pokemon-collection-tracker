@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { clearCardListNavigationState } from "@/components/AllCardsResetLink";
 
 const navItems = [
   { href: "/", label: "Dashboard" },
@@ -27,6 +28,7 @@ export function PrimaryNav() {
             href={item.href}
             aria-current={isActive ? "page" : undefined}
             className={`primary-nav-link rounded-md px-3 py-2 text-sm font-semibold ${isActive ? "is-active" : ""}`}
+            onClick={item.href === "/cards" ? clearCardListNavigationState : undefined}
           >
             {item.label}
           </Link>
