@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CardArtwork } from "@/components/CardArtwork";
 import { isManualMarketPriceSource } from "@/lib/domain";
 import { formatCurrency, formatMarketPrice } from "@/lib/format";
@@ -60,6 +60,18 @@ type VariantTableClientProps = {
 
 type OwnedFilter = "all" | "owned" | "missing";
 type SortKey = "checklist" | "name" | "rarity" | "owned" | "value";
+type CardListNavigationState = {
+  path: string;
+  scrollY: number;
+  query: string;
+  ownedFilter: OwnedFilter;
+  rarityFilter: string;
+  sortKey: SortKey;
+  selectedVariantId: number;
+  savedAt: string;
+};
+
+const cardListNavigationStateKey = "pokemonCardListNavigationState";
 
 function cardNumberValue(cardNumber: string) {
   const [number] = cardNumber.split("/");
@@ -98,6 +110,41 @@ function formatEnumLabel(value?: string | null) {
     .join(" ");
 }
 
+function isOwnedFilter(value: unknown): value is OwnedFilter {
+  return value === "all" || value === "owned" || value === "missing";
+}
+
+function isSortKey(value: unknown): value is SortKey {
+  return value === "checklist" || value === "name" || value === "rarity" || value === "owned" || value === "value";
+}
+
+function readCardListNavigationState() {
+  try {
+    const rawValue = window.sessionStorage.getItem(cardListNavigationStateKey);
+    if (!rawValue) {
+      return null;
+    }
+
+    const parsedValue = JSON.parse(rawValue) as Partial<CardListNavigationState>;
+    if (
+      typeof parsedValue.path !== "string" ||
+      !parsedValue.path.startsWith("/cards") ||
+      typeof parsedValue.scrollY !== "number" ||
+      typeof parsedValue.query !== "string" ||
+      !isOwnedFilter(parsedValue.ownedFilter) ||
+      typeof parsedValue.rarityFilter !== "string" ||
+      !isSortKey(parsedValue.sortKey) ||
+      typeof parsedValue.selectedVariantId !== "number"
+    ) {
+      return null;
+    }
+
+    return parsedValue as CardListNavigationState;
+  } catch {
+    return null;
+  }
+}
+
 export function VariantTableClient({
   variants,
   showSet = false,
@@ -108,6 +155,8 @@ export function VariantTableClient({
   const [ownedFilter, setOwnedFilter] = useState<OwnedFilter>("all");
   const [rarityFilter, setRarityFilter] = useState("all");
   const [sortKey, setSortKey] = useState<SortKey>("checklist");
+  const [restoreTarget, setRestoreTarget] = useState<{ variantId: number; scrollY: number } | null>(null);
+  const [restoredNavigationState, setRestoredNavigationState] = useState(false);
 
   const rarityOptions = useMemo(
     () => Array.from(new Set(variants.map((variant) => variant.card.rarity))).sort(compareRarity),
@@ -174,6 +223,68 @@ export function VariantTableClient({
   }, [ownedFilter, query, rarityFilter, showSet, sortKey, variants]);
 
   const visibleOwned = filteredVariants.filter(hasOwnedCopy).length;
+
+  useEffect(() => {
+    if (restoredNavigationState || typeof window === "undefined" || window.location.pathname !== "/cards") {
+      return;
+    }
+
+    const savedState = readCardListNavigationState();
+    setRestoredNavigationState(true);
+    if (!savedState || savedState.path !== `${window.location.pathname}${window.location.search}`) {
+      return;
+    }
+
+    setQuery(savedState.query);
+    setOwnedFilter(savedState.ownedFilter);
+    setRarityFilter(savedState.rarityFilter);
+    setSortKey(savedState.sortKey);
+    setRestoreTarget({ variantId: savedState.selectedVariantId, scrollY: savedState.scrollY });
+  }, [restoredNavigationState]);
+
+  useEffect(() => {
+    if (!restoreTarget || !filteredVariants.some((variant) => variant.id === restoreTarget.variantId)) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      window.scrollTo({ top: restoreTarget.scrollY, behavior: "auto" });
+
+      window.requestAnimationFrame(() => {
+        const selectedCard = document.getElementById(`variant-card-${restoreTarget.variantId}`);
+        const bounds = selectedCard?.getBoundingClientRect();
+        if (!selectedCard || !bounds || bounds.top < 80 || bounds.bottom > window.innerHeight) {
+          selectedCard?.scrollIntoView({ block: "center", behavior: "auto" });
+        }
+        setRestoreTarget(null);
+      });
+    }, 50);
+
+    return () => window.clearTimeout(timeout);
+  }, [filteredVariants, restoreTarget]);
+
+  function saveCardListNavigationState(selectedVariantId: number) {
+    if (typeof window === "undefined" || window.location.pathname !== "/cards") {
+      return;
+    }
+
+    const state: CardListNavigationState = {
+      path: `${window.location.pathname}${window.location.search}`,
+      scrollY: window.scrollY,
+      query,
+      ownedFilter,
+      rarityFilter,
+      sortKey,
+      selectedVariantId,
+      savedAt: new Date().toISOString(),
+    };
+
+    try {
+      window.sessionStorage.setItem(cardListNavigationStateKey, JSON.stringify(state));
+    } catch {
+      // Returning to the card list still works without restored state.
+    }
+  }
 
   return (
     <section className="neon-panel overflow-hidden rounded-lg">
@@ -259,6 +370,7 @@ export function VariantTableClient({
 
           return (
             <article
+              id={`variant-card-${variant.id}`}
               key={variant.id}
               className={`collection-card group relative flex min-h-[25rem] flex-col overflow-hidden rounded-lg border p-4 ${
                 owned
@@ -345,6 +457,7 @@ export function VariantTableClient({
                 <Link
                   href={`/cards/${variant.id}`}
                   className={`${owned ? "btn-primary" : "btn-secondary"} flex-1 whitespace-nowrap rounded-md px-3 py-2 text-center text-xs font-black transition`}
+                  onClick={() => saveCardListNavigationState(variant.id)}
                 >
                   View details
                 </Link>

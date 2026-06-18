@@ -2,6 +2,7 @@ import Link from "next/link";
 import { unstable_noStore as noStore } from "next/cache";
 import { notFound } from "next/navigation";
 import { updateVariantDetails } from "@/app/actions";
+import { CardListBackLink } from "@/components/CardListBackLink";
 import { CardArtwork } from "@/components/CardArtwork";
 import { CARD_CONDITION } from "@/lib/domain";
 import { formatEnumLabel, getMarketPrice, getPrimaryCopy, hasOwnedCopy } from "@/lib/collection";
@@ -64,12 +65,15 @@ export default async function CardDetailPage({ params, searchParams }: CardDetai
   return (
     <div className="card-detail-page space-y-6">
       <nav className="flex flex-wrap items-center justify-between gap-3" aria-label="Card navigation">
-        <Link href={`/sets/${variant.card.set.slug}`} className="text-sm font-bold text-cyan-300 transition hover:text-white">
-          Back to {variant.card.set.name}
-        </Link>
-        <Link href="/cards" className="btn-secondary inline-flex items-center justify-center rounded-md px-4 py-2.5 text-sm font-black transition">
-          All cards
-        </Link>
+        <CardListBackLink />
+        <div className="flex flex-wrap items-center gap-3">
+          <Link href={`/sets/${variant.card.set.slug}`} className="text-sm font-bold text-cyan-300 transition hover:text-white">
+            Back to {variant.card.set.name}
+          </Link>
+          <Link href="/cards" className="btn-secondary inline-flex items-center justify-center rounded-md px-4 py-2.5 text-sm font-black transition">
+            All cards
+          </Link>
+        </div>
       </nav>
 
       {searchParams.saved ? (
