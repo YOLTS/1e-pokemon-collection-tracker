@@ -140,3 +140,14 @@ model SaleRecord {
   @@index([collectionItemId])
   @@index([soldAt])
 }
+
+model SyncMutationReceipt {
+  id              Int      @id @default(autoincrement())
+  localMutationId String   @unique
+  type            String
+  appliedAt       DateTime @default(now())
+  result          Json?
+
+  @@index([type])
+  @@index([appliedAt])
+}
