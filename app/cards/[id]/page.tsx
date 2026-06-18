@@ -1,8 +1,7 @@
-import Link from "next/link";
 import { unstable_noStore as noStore } from "next/cache";
 import { notFound } from "next/navigation";
 import { updateVariantDetails } from "@/app/actions";
-import { AllCardsResetLink } from "@/components/AllCardsResetLink";
+import { AllCardsResetLink, SetResetLink } from "@/components/AllCardsResetLink";
 import { CardArtwork } from "@/components/CardArtwork";
 import { CardListBackLink } from "@/components/CardListBackLink";
 import { CARD_CONDITION } from "@/lib/domain";
@@ -70,9 +69,9 @@ export default async function CardDetailPage({ params, searchParams }: CardDetai
           <CardListBackLink />
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <Link href={`/sets/${variant.card.set.slug}`} className="text-sm font-bold text-cyan-300 transition hover:text-white">
+          <SetResetLink href={`/sets/${variant.card.set.slug}`} className="text-sm font-bold text-cyan-300 transition hover:text-white">
             Back to {variant.card.set.name}
-          </Link>
+          </SetResetLink>
           <AllCardsResetLink />
         </div>
       </nav>

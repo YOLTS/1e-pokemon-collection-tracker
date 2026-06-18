@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import type { ReactNode } from "react";
 
 const cardListNavigationStateKey = "pokemonCardListNavigationState";
 
@@ -20,6 +21,20 @@ export function AllCardsResetLink() {
       onClick={clearCardListNavigationState}
     >
       All cards
+    </Link>
+  );
+}
+
+type SetResetLinkProps = {
+  href: string;
+  children: ReactNode;
+  className?: string;
+};
+
+export function SetResetLink({ href, children, className }: SetResetLinkProps) {
+  return (
+    <Link href={href} className={className} onClick={clearCardListNavigationState}>
+      {children}
     </Link>
   );
 }
