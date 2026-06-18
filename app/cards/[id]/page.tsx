@@ -2,7 +2,9 @@ import Link from "next/link";
 import { unstable_noStore as noStore } from "next/cache";
 import { notFound } from "next/navigation";
 import { updateVariantDetails } from "@/app/actions";
+import { AllCardsResetLink } from "@/components/AllCardsResetLink";
 import { CardArtwork } from "@/components/CardArtwork";
+import { CardListBackLink } from "@/components/CardListBackLink";
 import { CARD_CONDITION } from "@/lib/domain";
 import { formatEnumLabel, getMarketPrice, getPrimaryCopy, hasOwnedCopy } from "@/lib/collection";
 import { formatCurrency, formatMarketPrice } from "@/lib/format";
@@ -65,17 +67,13 @@ export default async function CardDetailPage({ params, searchParams }: CardDetai
     <div className="card-detail-page space-y-6">
       <nav className="flex flex-wrap items-center justify-between gap-3" aria-label="Card navigation">
         <div className="flex flex-wrap items-center gap-3">
-          <Link href="/cards" className="btn-primary inline-flex items-center justify-center rounded-md px-4 py-2.5 text-sm font-black transition">
-            ← Back to Card List
-          </Link>
+          <CardListBackLink />
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <Link href={`/sets/${variant.card.set.slug}`} className="text-sm font-bold text-cyan-300 transition hover:text-white">
             Back to {variant.card.set.name}
           </Link>
-          <Link href="/cards" className="btn-secondary inline-flex items-center justify-center rounded-md px-4 py-2.5 text-sm font-black transition">
-            All cards
-          </Link>
+          <AllCardsResetLink />
         </div>
       </nav>
 
