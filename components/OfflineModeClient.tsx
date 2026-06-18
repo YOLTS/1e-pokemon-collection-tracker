@@ -6,12 +6,16 @@ import {
   clearPendingMutationDebugStores,
   enqueueLatestMarketPriceMutation,
   enqueueLatestSetOwnedMutation,
+  fetchAndSaveOfflineSnapshot,
   listAllPendingMutationDebugRecords,
   listOfflineMutationDebugEvents,
   listPendingMutations,
   loadOfflineSnapshot,
+  markMutationFailed,
+  markMutationSynced,
+  markMutationSyncing,
 } from "@/lib/offline-storage";
-import { applyLocalMutationAndPersist, type OfflineMutation } from "@/lib/offline-mutations";
+import { applyLocalMutationAndPersist, type OfflineMutation, type OfflineSyncResult } from "@/lib/offline-mutations";
 import {
   getOfflineMarketPrice,
   getOfflinePrimaryCopy,
@@ -29,6 +33,7 @@ type OfflineView =
   | { name: "card"; id: number };
 
 type OfflineLoadStatus = "loading" | "ready" | "empty" | "error";
+type ManualSyncStatus = "idle" | "syncing" | "synced" | "failed";
 
 type OfflineDebugInfo = {
   currentPath: string;
@@ -123,6 +128,9 @@ export function OfflineModeClient() {
   const [online, setOnline] = useState(false);
   const [blockedMessage, setBlockedMessage] = useState("");
   const [localMessage, setLocalMessage] = useState("");
+  const [syncMessage, setSyncMessage] = useState("");
+  const [syncStatus, setSyncStatus] = useState<ManualSyncStatus>("idle");
+  const [isSyncing, setIsSyncing] = useState(false);
   const [pendingMutationCount, setPendingMutationCount] = useState(0);
   const [debugPendingMutations, setDebugPendingMutations] = useState<OfflineMutation[]>([]);
   const [debugRawPendingMutations, setDebugRawPendingMutations] = useState<OfflineMutation[]>([]);
@@ -143,6 +151,7 @@ export function OfflineModeClient() {
     setView(initialView());
     setOnline(navigator.onLine);
     setServiceWorkerControlled(Boolean(navigator.serviceWorker?.controller));
+
     try {
       setServiceWorkerDebug(window.localStorage.getItem("pokemonServiceWorkerDebug") ?? "");
     } catch {
@@ -218,6 +227,10 @@ export function OfflineModeClient() {
   function navigate(nextView: OfflineView) {
     setBlockedMessage("");
     setLocalMessage("");
+    if (syncStatus !== "syncing") {
+      setSyncMessage("");
+      setSyncStatus("idle");
+    }
     setView(nextView);
   }
 
@@ -331,6 +344,112 @@ export function OfflineModeClient() {
       setBlockedMessage(error instanceof Error ? error.message : "Local price edit could not be saved.");
     } finally {
       setEditingPriceVariantId(null);
+    }
+  }
+
+  async function syncPendingMutations() {
+    if (isSyncing || !online || !snapshot) {
+      return;
+    }
+
+    setBlockedMessage("");
+    setLocalMessage("");
+    setSyncMessage("Syncing...");
+    setSyncStatus("syncing");
+    setIsSyncing(true);
+
+    let syncResultsHandled = false;
+    let mutationsToSync: OfflineMutation[] = [];
+
+    try {
+      mutationsToSync = (await listPendingMutations()).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+
+      if (mutationsToSync.length === 0) {
+        setSyncMessage("Synced just now");
+        setSyncStatus("synced");
+        return;
+      }
+
+      const syncingMutations = await Promise.all(
+        mutationsToSync.map((mutation) => markMutationSyncing(mutation.localMutationId)),
+      );
+
+      const response = await fetch("/api/sync-mutations", {
+        method: "POST",
+        cache: "no-store",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ mutations: syncingMutations }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Sync request failed with ${response.status}.`);
+      }
+
+      const body = (await response.json()) as { results?: OfflineSyncResult[] };
+      const results = Array.isArray(body.results) ? body.results : [];
+      const resultsById = new Map(results.map((result) => [result.localMutationId, result]));
+
+      await Promise.all(
+        syncingMutations.map(async (mutation) => {
+          const result = resultsById.get(mutation.localMutationId);
+
+          if (!result) {
+            await markMutationFailed(mutation.localMutationId, "Sync endpoint did not return a result.");
+            return;
+          }
+
+          if (result.status === "APPLIED" || result.status === "ALREADY_APPLIED") {
+            await markMutationSynced(mutation.localMutationId, result);
+            return;
+          }
+
+          await markMutationFailed(
+            mutation.localMutationId,
+            result.error ?? `Sync returned ${result.status}.`,
+          );
+        }),
+      );
+      syncResultsHandled = true;
+
+      const failedResults = results.filter((result) => result.status === "FAILED" || result.status === "CONFLICT");
+      const missingResults = syncingMutations.filter((mutation) => !resultsById.has(mutation.localMutationId));
+
+      if (failedResults.length === 0 && missingResults.length === 0) {
+        try {
+          const freshSnapshot = await fetchAndSaveOfflineSnapshot();
+          setSnapshot(freshSnapshot);
+        } catch (error) {
+          setDebugMessage(
+            error instanceof Error
+              ? `Sync succeeded, but snapshot refresh failed: ${error.message}`
+              : "Sync succeeded, but snapshot refresh failed.",
+          );
+        }
+        setSyncMessage("Synced just now");
+        setSyncStatus("synced");
+      } else {
+        setSyncMessage("Sync failed - changes still saved locally");
+        setSyncStatus("failed");
+      }
+    } catch (error) {
+      if (!syncResultsHandled) {
+        await Promise.all(
+          mutationsToSync.map((mutation) =>
+            markMutationFailed(
+              mutation.localMutationId,
+              error instanceof Error ? error.message : "Manual sync failed.",
+            ).catch(() => undefined),
+          ),
+        );
+      }
+      setSyncMessage("Sync failed - changes still saved locally");
+      setSyncStatus("failed");
+    } finally {
+      await refreshPendingMutationCount().catch(() => undefined);
+      setIsSyncing(false);
     }
   }
 
@@ -476,6 +595,18 @@ export function OfflineModeClient() {
             ) : null}
           </div>
           <div className="flex flex-wrap gap-2">
+            {online && pendingMutationCount > 0 ? (
+              <button
+                type="button"
+                className="btn-primary rounded-md px-3 py-2 text-xs font-black"
+                disabled={isSyncing}
+                onClick={() => {
+                  syncPendingMutations().catch(() => undefined);
+                }}
+              >
+                {isSyncing ? "Syncing..." : "Sync pending changes"}
+              </button>
+            ) : null}
             <button type="button" className="btn-secondary rounded-md px-3 py-2 text-xs font-black" onClick={() => navigate({ name: "dashboard" })}>
               Dashboard
             </button>
@@ -495,6 +626,15 @@ export function OfflineModeClient() {
         {localMessage ? (
           <p className="mt-4 rounded-md border border-emerald-300/25 bg-emerald-300/10 px-3 py-2 text-sm font-bold text-emerald-100">
             {localMessage}
+          </p>
+        ) : null}
+        {syncMessage ? (
+          <p className={`mt-4 rounded-md border px-3 py-2 text-sm font-bold ${
+            syncStatus === "failed"
+              ? "border-amber-300/25 bg-amber-300/10 text-amber-100"
+              : "border-emerald-300/25 bg-emerald-300/10 text-emerald-100"
+          }`}>
+            {syncMessage}
           </p>
         ) : null}
         {routeFallbackMessage ? (
