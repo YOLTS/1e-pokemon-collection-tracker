@@ -10,6 +10,7 @@ import type {
   OfflineMutationStatus,
   OfflineSyncResult,
   SetOwnedMutationPayload,
+  UpdateMarketPriceMutationPayload,
 } from "@/lib/offline-mutations";
 
 export const OFFLINE_DATABASE_NAME = "pokemon-collection-offline";
@@ -137,6 +138,17 @@ function isSetOwnedMutationForVariant(mutation: OfflineMutation, variantId: numb
   );
 }
 
+function isMarketPriceMutationForVariant(mutation: OfflineMutation, variantId: number) {
+  return (
+    mutation.type === "UPDATE_MARKET_PRICE" &&
+    isUnresolvedMutation(mutation) &&
+    typeof mutation.payload === "object" &&
+    mutation.payload !== null &&
+    "variantId" in mutation.payload &&
+    mutation.payload.variantId === variantId
+  );
+}
+
 export function isSupportedOfflineSnapshot(value: unknown): value is OfflineSnapshot {
   if (typeof value !== "object" || value === null) {
     return false;
@@ -256,6 +268,62 @@ export async function enqueueLatestSetOwnedMutation(
           localMutationId:
             newMutation.localMutationId ?? existingMutation?.localMutationId ?? createLocalMutationId(),
           type: "SET_OWNED",
+          payload: newMutation.payload,
+          createdAt: existingMutation?.createdAt ?? now,
+          updatedAt: now,
+          baseSnapshotGeneratedAt:
+            newMutation.baseSnapshotGeneratedAt ?? existingMutation?.baseSnapshotGeneratedAt ?? null,
+          baseServerUpdatedAt:
+            newMutation.baseServerUpdatedAt ?? existingMutation?.baseServerUpdatedAt ?? null,
+          status: "PENDING",
+          retryCount: 0,
+          lastAttemptAt: null,
+          lastError: null,
+        };
+
+        matchingMutations.forEach((matchingMutation) => {
+          if (matchingMutation.localMutationId !== mutation?.localMutationId) {
+            store.delete(matchingMutation.localMutationId);
+          }
+        });
+        store.put(mutation);
+      };
+      request.onerror = () => reject(request.error);
+      transaction.oncomplete = () => {
+        if (mutation) {
+          resolve(mutation);
+        }
+      };
+      transaction.onerror = () => reject(transaction.error);
+      transaction.onabort = () => reject(transaction.error);
+    });
+  });
+}
+
+export async function enqueueLatestMarketPriceMutation(
+  newMutation: NewOfflineMutation<UpdateMarketPriceMutationPayload>,
+) {
+  const now = new Date().toISOString();
+  const matchingVariantId = newMutation.payload.variantId;
+
+  return withOfflineDatabase(async (database) => {
+    return await new Promise<OfflineMutation>((resolve, reject) => {
+      const transaction = database.transaction(pendingMutationsStore, "readwrite");
+      const store = transaction.objectStore(pendingMutationsStore);
+      const request = store.getAll();
+      let mutation: OfflineMutation | null = null;
+
+      request.onsuccess = () => {
+        const matchingMutations = request.result
+          .filter(isOfflineMutation)
+          .filter((existingMutation) => isMarketPriceMutationForVariant(existingMutation, matchingVariantId))
+          .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+        const existingMutation = matchingMutations[0] ?? null;
+
+        mutation = {
+          localMutationId:
+            newMutation.localMutationId ?? existingMutation?.localMutationId ?? createLocalMutationId(),
+          type: "UPDATE_MARKET_PRICE",
           payload: newMutation.payload,
           createdAt: existingMutation?.createdAt ?? now,
           updatedAt: now,

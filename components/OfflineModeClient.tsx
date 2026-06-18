@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { CardArtwork } from "@/components/CardArtwork";
 import {
+  enqueueLatestMarketPriceMutation,
   enqueueLatestSetOwnedMutation,
   listPendingMutations,
   loadOfflineSnapshot,
@@ -121,6 +122,7 @@ export function OfflineModeClient() {
   const [localMessage, setLocalMessage] = useState("");
   const [pendingMutationCount, setPendingMutationCount] = useState(0);
   const [editingVariantId, setEditingVariantId] = useState<number | null>(null);
+  const [editingPriceVariantId, setEditingPriceVariantId] = useState<number | null>(null);
   const [currentPath, setCurrentPath] = useState("/");
   const [loadError, setLoadError] = useState("");
   const [serviceWorkerDebug, setServiceWorkerDebug] = useState("");
@@ -241,6 +243,43 @@ export function OfflineModeClient() {
       setBlockedMessage(error instanceof Error ? error.message : "Local ownership edit could not be saved.");
     } finally {
       setEditingVariantId(null);
+    }
+  }
+
+  async function updateOfflineMarketPrice(variant: OfflineVariant, value: number) {
+    if (!snapshot || editingPriceVariantId !== null) {
+      return;
+    }
+
+    setBlockedMessage("");
+    setLocalMessage("");
+    setEditingPriceVariantId(variant.id);
+
+    try {
+      const oldMarketPrice = getOfflineMarketPrice(variant);
+      const mutation = await enqueueLatestMarketPriceMutation({
+        type: "UPDATE_MARKET_PRICE",
+        baseSnapshotGeneratedAt: snapshot.generatedAt,
+        payload: {
+          variantId: variant.id,
+          setSlug: variant.card.set.slug,
+          oldEstimatedValue: variant.estimatedValue,
+          newEstimatedValue: value,
+          oldMarketPrice,
+          newMarketPrice: value,
+          marketPriceSource: "MANUAL_APP_EDIT",
+          marketPriceStatus: "MANUAL",
+        },
+      });
+      const updatedSnapshot = await applyLocalMutationAndPersist(mutation);
+      setSnapshot(updatedSnapshot);
+      const pendingCount = await refreshPendingMutationCount();
+      setLocalMessage(pendingCount === 1 ? "Saved locally · pending sync" : `${pendingCount} changes pending sync`);
+    } catch (error) {
+      await refreshPendingMutationCount().catch(() => undefined);
+      setBlockedMessage(error instanceof Error ? error.message : "Local price edit could not be saved.");
+    } finally {
+      setEditingPriceVariantId(null);
     }
   }
 
@@ -414,6 +453,8 @@ export function OfflineModeClient() {
           blockEdit={blockEdit}
           toggleOfflineOwned={toggleOfflineOwned}
           editingVariantId={editingVariantId}
+          updateOfflineMarketPrice={updateOfflineMarketPrice}
+          editingPriceVariantId={editingPriceVariantId}
         />
       ) : null}
     </div>
@@ -599,68 +640,111 @@ function OfflineCardDetail({
   blockEdit,
   toggleOfflineOwned,
   editingVariantId,
+  updateOfflineMarketPrice,
+  editingPriceVariantId,
 }: {
   variant: OfflineVariant;
   blockEdit: () => void;
   toggleOfflineOwned: (variant: OfflineVariant, owned: boolean) => void;
   editingVariantId: number | null;
+  updateOfflineMarketPrice: (variant: OfflineVariant, value: number) => void;
+  editingPriceVariantId: number | null;
 }) {
   const owned = hasOfflineOwnedCopy(variant);
   const primaryCopy = getOfflinePrimaryCopy(variant);
   const notes = primaryCopy?.notes || variant.notes;
+  const marketPrice = getOfflineMarketPrice(variant);
+
+  function handlePriceSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    const rawValue = String(formData.get("estimatedValue") ?? "").trim();
+    const parsedValue = rawValue === "" ? 0 : Number(rawValue);
+
+    if (!Number.isFinite(parsedValue) || parsedValue < 0) {
+      return;
+    }
+
+    updateOfflineMarketPrice(variant, parsedValue);
+  }
 
   return (
-    <section className="card-detail-showcase neon-panel overflow-hidden rounded-lg">
-      <div className="card-detail-artwork-stage">
-        <CardArtwork
-          name={variant.card.name}
-          cardNumber={variant.card.cardNumber}
-          setName={variant.card.set.name}
-          setSymbol={variant.card.set.symbol}
-          setColor={variant.card.set.color}
-          imageUrlSmall={variant.card.imageUrlSmall}
-          imageUrlLarge={variant.card.imageUrlLarge}
-          imageSource={variant.card.imageSource}
-          imageMatchStatus={variant.card.imageMatchStatus}
-          owned={owned}
-          preferLarge
-          priority
-          className="card-detail-artwork mx-auto w-full max-w-sm"
-        />
-      </div>
-      <div className="card-detail-record">
-        <p className="neon-eyebrow text-xs font-black uppercase tracking-widest">Read-only cached card</p>
-        <p className="mt-2 text-sm font-bold uppercase tracking-widest text-slate-500">
-          {variant.card.set.name} / No. {variant.card.cardNumber}
-        </p>
-        <h1 className="mt-2 text-4xl font-black leading-none text-white sm:text-5xl">{variant.card.name}</h1>
-        <dl className="card-detail-metrics mt-7 grid gap-px overflow-hidden rounded-lg sm:grid-cols-2">
-          <div><dt>Status</dt><dd>{owned ? "In collection" : "Missing"}</dd></div>
-          <div><dt>Condition</dt><dd>{formatEnumLabel(primaryCopy?.condition)}</dd></div>
-          <div><dt>Estimated market value</dt><dd>{formatMarketPrice(getOfflineMarketPrice(variant))}</dd></div>
-          <div><dt>Acquisition cost</dt><dd>{primaryCopy?.purchasePrice ? formatCurrency(primaryCopy.purchasePrice) : "Not recorded"}</dd></div>
-        </dl>
-        <div className="card-detail-provenance mt-7">
-          <p className="text-xs font-black uppercase tracking-widest text-slate-500">Collection notes</p>
-          <p className="mt-3 text-sm leading-7 text-slate-300">
-            {notes || (owned ? "No collector notes have been recorded for this copy." : "This card has not yet been added to the collection.")}
+    <div className="space-y-4">
+      <section className="card-detail-showcase neon-panel overflow-hidden rounded-lg">
+        <div className="card-detail-artwork-stage">
+          <CardArtwork
+            name={variant.card.name}
+            cardNumber={variant.card.cardNumber}
+            setName={variant.card.set.name}
+            setSymbol={variant.card.set.symbol}
+            setColor={variant.card.set.color}
+            imageUrlSmall={variant.card.imageUrlSmall}
+            imageUrlLarge={variant.card.imageUrlLarge}
+            imageSource={variant.card.imageSource}
+            imageMatchStatus={variant.card.imageMatchStatus}
+            owned={owned}
+            preferLarge
+            priority
+            className="card-detail-artwork mx-auto w-full max-w-sm"
+          />
+        </div>
+        <div className="card-detail-record">
+          <p className="neon-eyebrow text-xs font-black uppercase tracking-widest">Local cached card</p>
+          <p className="mt-2 text-sm font-bold uppercase tracking-widest text-slate-500">
+            {variant.card.set.name} / No. {variant.card.cardNumber}
           </p>
+          <h1 className="mt-2 text-4xl font-black leading-none text-white sm:text-5xl">{variant.card.name}</h1>
+          <dl className="card-detail-metrics mt-7 grid gap-px overflow-hidden rounded-lg sm:grid-cols-2">
+            <div><dt>Status</dt><dd>{owned ? "In collection" : "Missing"}</dd></div>
+            <div><dt>Condition</dt><dd>{formatEnumLabel(primaryCopy?.condition)}</dd></div>
+            <div><dt>Estimated market value</dt><dd>{formatMarketPrice(marketPrice)}</dd></div>
+            <div><dt>Acquisition cost</dt><dd>{primaryCopy?.purchasePrice ? formatCurrency(primaryCopy.purchasePrice) : "Not recorded"}</dd></div>
+          </dl>
+          <div className="card-detail-provenance mt-7">
+            <p className="text-xs font-black uppercase tracking-widest text-slate-500">Collection notes</p>
+            <p className="mt-3 text-sm leading-7 text-slate-300">
+              {notes || (owned ? "No collector notes have been recorded for this copy." : "This card has not yet been added to the collection.")}
+            </p>
+          </div>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <button
+              type="button"
+              className={`${owned ? "btn-secondary" : "btn-primary"} rounded-md px-4 py-3 text-sm font-black`}
+              disabled={editingVariantId !== null}
+              onClick={() => toggleOfflineOwned(variant, !owned)}
+            >
+              {editingVariantId === variant.id ? "Saving..." : owned ? "Mark missing" : "Mark owned"}
+            </button>
+            <button type="button" className="btn-secondary rounded-md px-4 py-3 text-sm font-black" onClick={blockEdit}>
+              Details require connection
+            </button>
+          </div>
         </div>
-        <div className="mt-6 flex flex-wrap gap-3">
+      </section>
+
+      <form onSubmit={handlePriceSubmit} className="card-detail-ledger neon-panel rounded-lg p-5 sm:p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <label className="block sm:max-w-xs sm:flex-1">
+            <span className="text-xs font-bold uppercase tracking-wide text-slate-500">Manual estimated value</span>
+            <input
+              name="estimatedValue"
+              type="number"
+              min="0"
+              step="0.01"
+              defaultValue={marketPrice ?? ""}
+              className="field-control mt-1 h-11 w-full rounded-md px-3 text-sm font-semibold text-white outline-none transition"
+            />
+          </label>
           <button
-            type="button"
-            className={`${owned ? "btn-secondary" : "btn-primary"} rounded-md px-4 py-3 text-sm font-black`}
-            disabled={editingVariantId !== null}
-            onClick={() => toggleOfflineOwned(variant, !owned)}
+            type="submit"
+            className="btn-primary rounded-md px-4 py-3 text-sm font-black"
+            disabled={editingPriceVariantId !== null}
           >
-            {editingVariantId === variant.id ? "Saving..." : owned ? "Mark missing" : "Mark owned"}
-          </button>
-          <button type="button" className="btn-secondary rounded-md px-4 py-3 text-sm font-black" onClick={blockEdit}>
-            Price/details require connection
+            {editingPriceVariantId === variant.id ? "Saving..." : "Save value"}
           </button>
         </div>
-      </div>
-    </section>
+      </form>
+    </div>
   );
 }
 
