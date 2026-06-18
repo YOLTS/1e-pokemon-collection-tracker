@@ -17,10 +17,13 @@ import {
   getOfflineMarketPrice,
   getOfflinePrimaryCopy,
   hasOfflineOwnedCopy,
+  type OfflineSetMetric,
   type OfflineSnapshot,
   type OfflineVariant,
 } from "@/lib/offline-snapshot";
-import { formatCurrency, formatMarketPrice } from "@/lib/format";
+import { formatCurrency, formatMarketPrice, formatPercent } from "@/lib/format";
+import { ProgressDonut } from "@/components/ProgressDonut";
+import { compareRarity, rarityToken } from "@/lib/rarity";
 
 type OfflineView =
   | { name: "dashboard" }
@@ -31,6 +34,8 @@ type OfflineView =
 
 type OfflineLoadStatus = "loading" | "ready" | "empty" | "error";
 type ManualSyncStatus = "idle" | "syncing" | "synced" | "failed";
+type OwnedFilter = "all" | "owned" | "missing";
+type SortKey = "checklist" | "name" | "rarity" | "owned" | "value";
 
 type OfflineDebugInfo = {
   currentPath: string;
@@ -56,6 +61,20 @@ function formatEnumLabel(value?: string | null) {
     .split("_")
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
+}
+
+function cardNumberValue(cardNumber: string) {
+  const [number] = cardNumber.split("/");
+  return Number(number) || 0;
+}
+
+function offlineGradingLabel(variant: OfflineVariant) {
+  const primaryCopy = getOfflinePrimaryCopy(variant);
+  if (!primaryCopy) {
+    return "-";
+  }
+
+  return `${formatEnumLabel(primaryCopy.gradingCompany)}${primaryCopy.grade ? ` ${primaryCopy.grade}` : ""}`;
 }
 
 function formatTimestamp(value: string) {
@@ -623,34 +642,96 @@ function OfflineDashboard({
   navigate: (view: OfflineView) => void;
 }) {
   const summary = snapshot.dashboard.summary;
+  const activeSets = snapshot.dashboard.setMetrics.filter((metric) => metric.owned > 0).length;
+  const holoOwned = snapshot.dashboard.setMetrics.reduce((total, metric) => total + metric.holoOwned, 0);
+  const holoTotal = snapshot.dashboard.setMetrics.reduce((total, metric) => total + metric.holoTotal, 0);
+  const leadingSet = [...snapshot.dashboard.setMetrics].sort((a, b) => b.completion - a.completion)[0];
 
   return (
     <>
-      <section className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-        <OfflineStat label="Owned" value={String(summary.ownedVariants)} />
-        <OfflineStat label="Missing" value={String(summary.missingVariants)} />
-        <OfflineStat label="Collected value" value={formatCurrency(summary.estimatedCollectionValue)} />
-        <OfflineStat label="Remaining cost" value={formatCurrency(summary.estimatedRemainingCost)} />
+      <section className="neon-panel command-hero rounded-lg p-0">
+        <div className="relative overflow-hidden rounded-lg">
+          <div className="absolute left-0 top-0 h-full w-1 bg-gradient-to-b from-cyan-300 via-fuchsia-300 to-amber-300 opacity-80" />
+          <div className="flex flex-wrap items-start justify-between gap-4 border-b border-cyan-300/15 px-5 py-4 sm:px-7">
+            <div>
+              <p className="neon-eyebrow text-base font-black uppercase tracking-widest">Local portfolio console</p>
+              <h1 className="mt-1.5 text-3xl font-black text-white sm:text-4xl">1st Edition Vintage Collection</h1>
+            </div>
+            <div className="rounded-md border border-amber-300/30 bg-amber-300/10 px-4 py-2.5 text-lg font-black uppercase tracking-wide text-amber-100 shadow-amber">
+              {Math.round(summary.completion)}% complete
+            </div>
+          </div>
+
+          <div className="grid gap-5 px-5 py-5 sm:gap-8 sm:px-7 sm:py-6 lg:grid-cols-[19rem_1fr] lg:items-center">
+            <div className="flex justify-center lg:justify-start">
+              <div className="rounded-lg border border-cyan-300/25 bg-slate-950/[0.68] p-2.5 shadow-[0_24px_70px_rgba(0,0,0,0.38),0_0_48px_rgba(34,211,238,0.14)] sm:p-4">
+                <ProgressDonut value={summary.completion} label="complete" />
+              </div>
+            </div>
+
+            <div className="grid gap-6 sm:gap-8 md:grid-cols-[1fr_0.95fr]">
+              <div>
+                <p className="text-xl font-black uppercase tracking-widest text-cyan-100/90">Collection status</p>
+                <div className="neon-divider mt-3 max-w-lg" />
+                <dl className="mt-4 space-y-3 text-xl font-black uppercase tracking-wide sm:mt-5 sm:space-y-5 sm:text-2xl">
+                  {[
+                    ["Owned", summary.ownedVariants],
+                    ["Missing", summary.missingVariants],
+                    ["Total targets", summary.totalVariants],
+                  ].map(([label, value]) => (
+                    <div key={label} className="grid grid-cols-[8.5rem_1fr_auto] items-center gap-3 sm:grid-cols-[11rem_1fr_auto] sm:gap-4">
+                      <dt className="text-slate-200">{label}</dt>
+                      <dd className="h-px bg-gradient-to-r from-cyan-300/45 via-fuchsia-300/25 to-transparent" />
+                      <dd className="text-2xl text-white sm:text-3xl">{value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+
+              <div>
+                <p className="text-xl font-black uppercase tracking-widest text-amber-100/90">Collection value</p>
+                <div className="neon-divider mt-3 max-w-lg" />
+                <dl className="mt-4 space-y-3 text-xl font-black uppercase tracking-wide sm:mt-5 sm:space-y-5 sm:text-2xl">
+                  <div className="grid grid-cols-[8.5rem_1fr_auto] items-center gap-3 sm:grid-cols-[11rem_1fr_auto] sm:gap-4">
+                    <dt className="text-slate-200">Collected</dt>
+                    <dd className="h-px bg-gradient-to-r from-emerald-300/45 via-cyan-300/25 to-transparent" />
+                    <dd className="text-2xl text-emerald-100 sm:text-3xl">{formatCurrency(summary.estimatedCollectionValue)}</dd>
+                  </div>
+                  <div className="grid grid-cols-[8.5rem_1fr_auto] items-center gap-3 sm:grid-cols-[11rem_1fr_auto] sm:gap-4">
+                    <dt className="text-slate-200">Remaining</dt>
+                    <dd className="h-px bg-gradient-to-r from-amber-300/45 via-fuchsia-300/25 to-transparent" />
+                    <dd className="text-2xl text-amber-100 sm:text-3xl">{formatCurrency(summary.estimatedRemainingCost)}</dd>
+                  </div>
+                  <div className="flex items-center justify-between gap-3 border-t border-white/10 pt-3 text-sm normal-case tracking-normal text-slate-400">
+                    <span>{summary.pricedVariants} / {summary.totalVariants} cards priced</span>
+                    <span className="font-bold text-cyan-100/80">Local snapshot</span>
+                  </div>
+                </dl>
+              </div>
+            </div>
+          </div>
+        </div>
       </section>
+
+      <section className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+        <OfflineStat label="Active sets" value={`${activeSets}/${snapshot.sets.length}`} helper="Sets with at least one owned card" />
+        <OfflineStat label="Holo progress" value={`${holoOwned}/${holoTotal}`} helper="Rare holo targets collected" />
+        <OfflineStat label="Leading set" value={leadingSet?.set.name ?? "None"} helper={leadingSet ? `${Math.round(leadingSet.completion)}% complete` : "No set progress yet"} />
+        <OfflineStat label="Recent additions" value={String(snapshot.dashboard.recentItems.length)} helper="Latest owned inventory records" />
+      </section>
+
+      <div className="flex items-end justify-between gap-3">
+        <div>
+          <p className="neon-eyebrow text-xs font-black uppercase tracking-widest">Display vault</p>
+          <h2 className="mt-1 text-xl font-black text-white">Set progress</h2>
+        </div>
+        <button type="button" className="text-sm font-bold text-cyan-300 hover:text-white" onClick={() => navigate({ name: "sets" })}>
+          View all
+        </button>
+      </div>
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {snapshot.dashboard.setMetrics.slice(0, 6).map((metric) => (
-          <button
-            key={metric.set.slug}
-            type="button"
-            className="neon-panel neon-panel-hover rounded-lg p-5 text-left"
-            onClick={() => navigate({ name: "set", slug: metric.set.slug })}
-          >
-            <div className="flex items-start justify-between gap-3">
-              <h2 className="text-xl font-black text-white">{metric.set.name}</h2>
-              <span className="rounded-md border border-cyan-300/25 bg-cyan-300/10 px-2 py-1 text-xs font-black text-cyan-100">
-                {metric.owned}/{metric.total}
-              </span>
-            </div>
-            <p className="mt-3 text-sm font-semibold text-slate-400">
-              {Math.round(metric.completion)}% complete - {metric.missing} missing
-            </p>
-            <p className="mt-3 text-sm font-bold text-amber-100">Remaining {formatCurrency(metric.remainingValue)}</p>
-          </button>
+          <OfflineSetProgressButton key={metric.set.slug} metric={metric} navigate={navigate} />
         ))}
       </section>
     </>
@@ -667,22 +748,78 @@ function OfflineSets({
   return (
     <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
       {snapshot.dashboard.setMetrics.map((metric) => (
-        <button
-          key={metric.set.slug}
-          type="button"
-          className="neon-panel neon-panel-hover rounded-lg p-5 text-left"
-          onClick={() => navigate({ name: "set", slug: metric.set.slug })}
-        >
-          <h2 className="text-xl font-black text-white">{metric.set.name}</h2>
-          <p className="mt-2 text-sm font-semibold text-slate-400">
-            {metric.owned}/{metric.total} owned - {Math.round(metric.completion)}% complete
-          </p>
-          <p className="mt-3 text-sm text-slate-400">
-            Owned {formatCurrency(metric.ownedValue)} - Remaining {formatCurrency(metric.remainingValue)}
-          </p>
-        </button>
+        <OfflineSetProgressButton key={metric.set.slug} metric={metric} navigate={navigate} />
       ))}
     </section>
+  );
+}
+
+function OfflineSetProgressButton({
+  metric,
+  navigate,
+}: {
+  metric: OfflineSetMetric;
+  navigate: (view: OfflineView) => void;
+}) {
+  const visualCompletion = metric.completion > 0 ? Math.max(2.5, Math.min(100, metric.completion)) : 0;
+
+  return (
+    <button
+      type="button"
+      className="neon-panel neon-panel-hover group rounded-lg p-5 text-left"
+      onClick={() => navigate({ name: "set", slug: metric.set.slug })}
+    >
+      <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-300 via-fuchsia-300 to-amber-300 opacity-70" />
+      <div className="flex min-h-8 items-start justify-between gap-4">
+        <h2 className="text-xl font-black leading-tight text-white">{metric.set.name}</h2>
+        <span className="shrink-0 rounded-md border border-cyan-300/25 bg-cyan-300/10 px-2 py-1 text-xs font-black text-cyan-100 shadow-glow">
+          {metric.owned}/{metric.total || 0}
+        </span>
+      </div>
+
+      <div className="mt-4 flex items-center gap-3">
+        <div className="shrink-0 rounded-lg border border-cyan-300/15 bg-slate-950/55 p-1.5 shadow-glow">
+          <div
+            className="grid size-12 place-items-center rounded-md text-sm font-black text-slate-950 shadow-[0_0_28px_rgba(34,211,238,0.24)] ring-1 ring-white/25"
+            style={{ backgroundColor: metric.set.color }}
+            title={metric.set.symbolLabel}
+          >
+            {metric.set.symbol}
+          </div>
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-slate-300">{metric.set.releaseYear}</p>
+          <p className="mt-0.5 text-sm text-slate-500">{metric.set.totalCards} total cards</p>
+        </div>
+      </div>
+
+      <div className="mt-5 h-3 overflow-hidden rounded-full bg-slate-950/80 shadow-inner shadow-black/50 ring-1 ring-white/10">
+        <div
+          className="h-full min-w-px rounded-full bg-gradient-to-r from-cyan-300 via-emerald-300 to-amber-300 shadow-[0_0_20px_rgba(251,191,36,0.4)] transition-all duration-500"
+          style={{ width: `${visualCompletion}%` }}
+        />
+      </div>
+      <div className="mt-3 flex items-center justify-between gap-3 text-sm">
+        <p className="font-semibold text-cyan-100">{formatPercent(metric.completion)} complete</p>
+        <p className="font-semibold text-slate-500">{metric.missing} missing</p>
+      </div>
+      <div className="neon-divider mt-4" />
+      <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Priced owned</p>
+          <p className="mt-1 font-black text-white">{formatCurrency(metric.ownedValue)}</p>
+        </div>
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Priced missing</p>
+          <p className="mt-1 font-black text-white">{formatCurrency(metric.remainingValue)}</p>
+        </div>
+        <p className="col-span-2 text-xs font-semibold text-slate-500">{metric.priced} / {metric.total} cards priced</p>
+        <div className="col-span-2 flex items-center justify-between rounded-md border border-fuchsia-300/20 bg-fuchsia-400/[0.07] px-3 py-2 text-xs font-bold text-fuchsia-100">
+          <span>Holo progress</span>
+          <span>{metric.holoOwned}/{metric.holoTotal}</span>
+        </div>
+      </div>
+    </button>
   );
 }
 
@@ -703,38 +840,155 @@ function OfflineCards({
   toggleOfflineOwned: (variant: OfflineVariant, owned: boolean) => void;
   editingVariantId: number | null;
 }) {
+  const [ownedFilter, setOwnedFilter] = useState<OwnedFilter>("all");
+  const [rarityFilter, setRarityFilter] = useState("all");
+  const [sortKey, setSortKey] = useState<SortKey>("checklist");
+
+  const rarityOptions = useMemo(
+    () => Array.from(new Set(variants.map((variant) => variant.card.rarity))).sort(compareRarity),
+    [variants],
+  );
+
+  const displayedVariants = useMemo(() => {
+    return variants
+      .filter((variant) => {
+        const owned = hasOfflineOwnedCopy(variant);
+        const matchesOwned = ownedFilter === "all" || (ownedFilter === "owned" ? owned : !owned);
+        const matchesRarity = rarityFilter === "all" || variant.card.rarity === rarityFilter;
+
+        return matchesOwned && matchesRarity;
+      })
+      .sort((a, b) => {
+        if (sortKey === "name") {
+          return a.card.name.localeCompare(b.card.name);
+        }
+
+        if (sortKey === "rarity") {
+          return (
+            compareRarity(a.card.rarity, b.card.rarity) ||
+            cardNumberValue(a.card.cardNumber) - cardNumberValue(b.card.cardNumber)
+          );
+        }
+
+        if (sortKey === "owned") {
+          return Number(hasOfflineOwnedCopy(b)) - Number(hasOfflineOwnedCopy(a));
+        }
+
+        if (sortKey === "value") {
+          const aPrice = getOfflineMarketPrice(a);
+          const bPrice = getOfflineMarketPrice(b);
+          if (aPrice === null && bPrice !== null) return 1;
+          if (aPrice !== null && bPrice === null) return -1;
+          if (aPrice !== null && bPrice !== null) return bPrice - aPrice;
+          return 0;
+        }
+
+        if (a.card.set.name !== b.card.set.name) {
+          return a.card.set.name.localeCompare(b.card.set.name);
+        }
+
+        return cardNumberValue(a.card.cardNumber) - cardNumberValue(b.card.cardNumber);
+      });
+  }, [ownedFilter, rarityFilter, sortKey, variants]);
+
+  const visibleOwned = displayedVariants.filter(hasOfflineOwnedCopy).length;
+
   return (
     <section className="neon-panel overflow-hidden rounded-lg">
+      <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-300 via-fuchsia-300 to-amber-300 opacity-70" />
       <div className="border-b border-cyan-300/10 bg-slate-950/[0.62] p-4">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
           <div>
-            <p className="neon-eyebrow text-xs font-black uppercase tracking-widest">Local cards</p>
-            <h2 className="mt-1 text-xl font-black text-white">{title}</h2>
-            <p className="mt-1 text-sm text-slate-400">Showing {variants.length} cached cards</p>
+            <p className="neon-eyebrow text-xs font-black uppercase tracking-widest">Local inventory console</p>
+            <h2 className="mt-1 text-lg font-black text-white">{title}</h2>
+            <p className="mt-1 text-sm text-slate-400">
+              Showing {displayedVariants.length} of {variants.length} cached cards, {visibleOwned} owned
+            </p>
           </div>
-          <label className="block lg:min-w-80">
-            <span className="text-xs font-bold uppercase tracking-wide text-slate-500">Search</span>
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Name, number, set, notes"
-              className="field-control mt-1 h-10 w-full rounded-md px-3 text-sm text-white outline-none transition placeholder:text-slate-600"
-            />
-          </label>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:min-w-[760px]">
+            <label className="block">
+              <span className="text-xs font-bold uppercase tracking-wide text-slate-500">Search</span>
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Name, number, set, notes"
+                className="field-control mt-1 h-10 w-full rounded-md px-3 text-sm text-white outline-none transition placeholder:text-slate-600"
+              />
+            </label>
+            <label className="block">
+              <span className="text-xs font-bold uppercase tracking-wide text-slate-500">Owned</span>
+              <select
+                value={ownedFilter}
+                onChange={(event) => setOwnedFilter(event.target.value as OwnedFilter)}
+                className="field-control mt-1 h-10 w-full rounded-md px-3 text-sm font-semibold text-white outline-none transition"
+              >
+                <option value="all">All cards</option>
+                <option value="owned">Owned only</option>
+                <option value="missing">Missing only</option>
+              </select>
+            </label>
+            <label className="block">
+              <span className="text-xs font-bold uppercase tracking-wide text-slate-500">Rarity</span>
+              <select
+                value={rarityFilter}
+                onChange={(event) => setRarityFilter(event.target.value)}
+                className="field-control mt-1 h-10 w-full rounded-md px-3 text-sm font-semibold text-white outline-none transition"
+              >
+                <option value="all">All rarities</option>
+                {rarityOptions.map((rarity) => (
+                  <option key={rarity} value={rarity}>
+                    {rarity}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block">
+              <span className="text-xs font-bold uppercase tracking-wide text-slate-500">Sort</span>
+              <select
+                value={sortKey}
+                onChange={(event) => setSortKey(event.target.value as SortKey)}
+                className="field-control mt-1 h-10 w-full rounded-md px-3 text-sm font-semibold text-white outline-none transition"
+              >
+                <option value="checklist">Checklist order</option>
+                <option value="name">Card name</option>
+                <option value="rarity">Rarity</option>
+                <option value="owned">Owned first</option>
+                <option value="value">Value high-low</option>
+              </select>
+            </label>
+          </div>
         </div>
       </div>
       <div className="collection-grid grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3">
-        {variants.map((variant) => {
+        {displayedVariants.map((variant) => {
           const owned = hasOfflineOwnedCopy(variant);
           const primaryCopy = getOfflinePrimaryCopy(variant);
+          const marketPrice = getOfflineMarketPrice(variant);
+          const notes = primaryCopy?.notes || variant.notes;
+
           return (
             <article
               key={variant.id}
-              className={`collection-card relative flex min-h-[24rem] flex-col overflow-hidden rounded-lg border p-4 ${
-                owned ? "border-cyan-300/25 bg-cyan-300/[0.055]" : "border-white/[0.08] bg-slate-950/[0.48]"
+              className={`collection-card group relative flex min-h-[25rem] flex-col overflow-hidden rounded-lg border p-4 ${
+                owned
+                  ? "is-owned border-cyan-300/25 bg-cyan-300/[0.055]"
+                  : "is-missing border-white/[0.08] bg-slate-950/[0.48]"
               }`}
             >
-              <div className="grid grid-cols-[7rem_1fr] gap-4">
+              <div className={`rarity-edge rarity-${rarityToken(variant.card.rarity)} ${owned ? "is-owned" : "is-missing"}`} />
+
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-600">Local archive record</p>
+                  <p className="mt-1 truncate text-xs font-bold text-slate-400">{variant.card.set.name}</p>
+                </div>
+                <span className={`ownership-badge ${owned ? "is-owned" : "is-missing"}`}>
+                  <span className="ownership-badge-dot" aria-hidden="true" />
+                  {owned ? "Owned" : "Missing"}
+                </span>
+              </div>
+
+              <div className="mt-4 grid grid-cols-[7.25rem_1fr] gap-4">
                 <CardArtwork
                   name={variant.card.name}
                   cardNumber={variant.card.cardNumber}
@@ -747,27 +1001,43 @@ function OfflineCards({
                   imageMatchStatus={variant.card.imageMatchStatus}
                   owned={owned}
                 />
-                <div>
+                <div className="flex min-w-0 flex-col py-1">
                   <p className="font-mono text-xs font-bold text-cyan-100/65">#{variant.card.cardNumber}</p>
-                  <h3 className="mt-2 text-xl font-black leading-tight text-white">{variant.card.name}</h3>
-                  <p className="mt-2 text-sm font-semibold text-slate-400">{variant.card.set.name}</p>
-                  <p className="mt-3 text-sm font-black text-amber-100">{formatMarketPrice(getOfflineMarketPrice(variant))}</p>
+                  <h3 className={`mt-2 text-xl font-black leading-tight ${owned ? "text-white" : "text-slate-200"}`}>{variant.card.name}</h3>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <span className={`rarity-badge rarity-${rarityToken(variant.card.rarity)}`}>
+                      {variant.card.rarity}
+                    </span>
+                    <span className="inline-flex rounded-md border border-white/[0.08] bg-white/[0.035] px-2 py-1 text-xs font-bold text-slate-400">
+                      {formatEnumLabel(variant.finish)}
+                    </span>
+                  </div>
+                  <p className="mt-auto pt-3 text-xs font-semibold text-slate-500">{formatEnumLabel(variant.edition)}</p>
                 </div>
               </div>
-              <dl className="mt-4 grid grid-cols-3 gap-3 border-y border-white/[0.07] py-3 text-sm">
-                <div>
-                  <dt className="text-[10px] font-black uppercase tracking-wide text-slate-600">Status</dt>
-                  <dd className="mt-1 font-semibold text-slate-300">{owned ? "Owned" : "Missing"}</dd>
-                </div>
+              <dl className="mt-4 grid grid-cols-4 gap-3 border-y border-white/[0.07] py-3 text-sm">
                 <div>
                   <dt className="text-[10px] font-black uppercase tracking-wide text-slate-600">Condition</dt>
                   <dd className="mt-1 font-semibold text-slate-300">{formatEnumLabel(primaryCopy?.condition)}</dd>
+                </div>
+                <div>
+                  <dt className="text-[10px] font-black uppercase tracking-wide text-slate-600">Grading</dt>
+                  <dd className="mt-1 font-semibold text-slate-300">{offlineGradingLabel(variant)}</dd>
+                </div>
+                <div>
+                  <dt className="text-[10px] font-black uppercase tracking-wide text-slate-600">Market</dt>
+                  <dd className={`mt-1 font-black ${marketPrice !== null ? "text-white" : "text-slate-600"}`}>
+                    {formatMarketPrice(marketPrice)}
+                  </dd>
                 </div>
                 <div>
                   <dt className="text-[10px] font-black uppercase tracking-wide text-slate-600">Paid</dt>
                   <dd className="mt-1 font-semibold text-slate-300">{primaryCopy?.purchasePrice ? formatCurrency(primaryCopy.purchasePrice) : "-"}</dd>
                 </div>
               </dl>
+              <p className="mt-3 line-clamp-2 min-h-10 text-sm leading-relaxed text-slate-500">
+                {notes || (owned ? "No collector notes yet." : "Not yet added to the collection.")}
+              </p>
               <div className="mt-auto flex gap-2 pt-4">
                 <button type="button" className="btn-primary flex-1 rounded-md px-3 py-2 text-xs font-black" onClick={() => navigate({ name: "card", id: variant.id })}>
                   View details
@@ -785,6 +1055,11 @@ function OfflineCards({
           );
         })}
       </div>
+      {displayedVariants.length === 0 ? (
+        <div className="p-8 text-center text-sm font-semibold text-slate-400">
+          No cards match the current filters.
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -902,11 +1177,12 @@ function OfflineCardDetail({
   );
 }
 
-function OfflineStat({ label, value }: { label: string; value: string }) {
+function OfflineStat({ label, value, helper }: { label: string; value: string; helper?: string }) {
   return (
     <section className="neon-panel rounded-lg p-5">
       <p className="text-sm font-semibold text-slate-400">{label}</p>
       <p className="mt-2 text-3xl font-black text-white">{value}</p>
+      {helper ? <p className="mt-2 text-xs font-semibold text-slate-500">{helper}</p> : null}
     </section>
   );
 }
