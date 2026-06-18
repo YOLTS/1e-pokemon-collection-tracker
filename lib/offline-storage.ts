@@ -11,8 +11,8 @@ import {
   type OfflineSyncResult,
 } from "@/lib/offline-mutations";
 
-const databaseName = "pokemon-collection-offline";
-const databaseVersion = 2;
+export const OFFLINE_DATABASE_NAME = "pokemon-collection-offline";
+export const OFFLINE_DATABASE_VERSION = 2;
 const snapshotStore = "snapshots";
 const metadataStore = "metadata";
 const pendingMutationsStore = "pendingMutations";
@@ -29,7 +29,7 @@ function createPendingMutationsStore(database: IDBDatabase) {
 
 function openOfflineDatabase() {
   return new Promise<IDBDatabase>((resolve, reject) => {
-    const request = indexedDB.open(databaseName, databaseVersion);
+    const request = indexedDB.open(OFFLINE_DATABASE_NAME, OFFLINE_DATABASE_VERSION);
 
     request.onupgradeneeded = () => {
       const database = request.result;
@@ -50,8 +50,33 @@ function openOfflineDatabase() {
     };
 
     request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
+    request.onerror = () => {
+      reject(request.error ?? new Error("Offline database could not be opened."));
+    };
   });
+}
+
+function normalizeIndexedDBError(error: unknown) {
+  if (error instanceof DOMException && error.name === "VersionError") {
+    return new Error(
+      `Offline storage needs the latest app update. Close and reopen the app while online, then try offline mode again. (${error.message})`,
+    );
+  }
+
+  return error;
+}
+
+async function withOfflineDatabase<T>(callback: (database: IDBDatabase) => Promise<T>) {
+  try {
+    const database = await openOfflineDatabase();
+    try {
+      return await callback(database);
+    } finally {
+      database.close();
+    }
+  } catch (error) {
+    throw normalizeIndexedDBError(error);
+  }
 }
 
 function createLocalMutationId() {
@@ -123,19 +148,15 @@ export async function saveOfflineSnapshot(snapshot: OfflineSnapshot) {
     throw new Error("Unsupported offline snapshot schema.");
   }
 
-  const database = await openOfflineDatabase();
-  try {
+  return withOfflineDatabase(async (database) => {
     const transaction = database.transaction(snapshotStore, "readwrite");
     transaction.objectStore(snapshotStore).put(snapshot, latestSnapshotKey);
     await transactionComplete(transaction);
-  } finally {
-    database.close();
-  }
+  });
 }
 
 export async function loadOfflineSnapshot() {
-  const database = await openOfflineDatabase();
-  try {
+  return withOfflineDatabase(async (database) => {
     return await new Promise<OfflineSnapshot | null>((resolve, reject) => {
       const transaction = database.transaction(snapshotStore, "readonly");
       const request = transaction.objectStore(snapshotStore).get(latestSnapshotKey);
@@ -146,9 +167,7 @@ export async function loadOfflineSnapshot() {
       };
       request.onerror = () => reject(request.error);
     });
-  } finally {
-    database.close();
-  }
+  });
 }
 
 export async function fetchAndSaveOfflineSnapshot() {
@@ -188,21 +207,17 @@ export async function enqueueMutation(newMutation: NewOfflineMutation) {
     lastError: null,
   };
 
-  const database = await openOfflineDatabase();
-  try {
+  await withOfflineDatabase(async (database) => {
     const transaction = database.transaction(pendingMutationsStore, "readwrite");
     transaction.objectStore(pendingMutationsStore).put(mutation);
     await transactionComplete(transaction);
-  } finally {
-    database.close();
-  }
+  });
 
   return mutation;
 }
 
 export async function listPendingMutations() {
-  const database = await openOfflineDatabase();
-  try {
+  return withOfflineDatabase(async (database) => {
     const transaction = database.transaction(pendingMutationsStore, "readonly");
     const request = transaction.objectStore(pendingMutationsStore).getAll();
     const mutations = await requestResult(request);
@@ -211,9 +226,7 @@ export async function listPendingMutations() {
       .filter(isOfflineMutation)
       .filter((mutation) => mutation.status === "PENDING" || mutation.status === "SYNCING" || mutation.status === "FAILED")
       .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-  } finally {
-    database.close();
-  }
+  });
 }
 
 async function updateMutationStatus(
@@ -221,8 +234,7 @@ async function updateMutationStatus(
   status: OfflineMutationStatus,
   changes: Partial<Pick<OfflineMutation, "retryCount" | "lastAttemptAt" | "lastError">> = {},
 ) {
-  const database = await openOfflineDatabase();
-  try {
+  return withOfflineDatabase(async (database) => {
     return await new Promise<OfflineMutation>((resolve, reject) => {
       const transaction = database.transaction(pendingMutationsStore, "readwrite");
       const store = transaction.objectStore(pendingMutationsStore);
@@ -255,9 +267,7 @@ async function updateMutationStatus(
       transaction.onerror = () => reject(transaction.error);
       transaction.onabort = () => reject(transaction.error);
     });
-  } finally {
-    database.close();
-  }
+  });
 }
 
 export async function markMutationSyncing(localMutationId: string) {
@@ -268,8 +278,7 @@ export async function markMutationSyncing(localMutationId: string) {
 }
 
 export async function markMutationSynced(localMutationId: string, syncResult?: OfflineSyncResult) {
-  const database = await openOfflineDatabase();
-  try {
+  return withOfflineDatabase(async (database) => {
     return await new Promise<OfflineMutation>((resolve, reject) => {
       const transaction = database.transaction([pendingMutationsStore, syncResultsStore], "readwrite");
       const pendingStore = transaction.objectStore(pendingMutationsStore);
@@ -307,14 +316,11 @@ export async function markMutationSynced(localMutationId: string, syncResult?: O
       transaction.onerror = () => reject(transaction.error);
       transaction.onabort = () => reject(transaction.error);
     });
-  } finally {
-    database.close();
-  }
+  });
 }
 
 export async function markMutationFailed(localMutationId: string, error: string) {
-  const database = await openOfflineDatabase();
-  try {
+  return withOfflineDatabase(async (database) => {
     return await new Promise<OfflineMutation>((resolve, reject) => {
       const transaction = database.transaction(pendingMutationsStore, "readwrite");
       const store = transaction.objectStore(pendingMutationsStore);
@@ -350,7 +356,5 @@ export async function markMutationFailed(localMutationId: string, error: string)
       transaction.onerror = () => reject(transaction.error);
       transaction.onabort = () => reject(transaction.error);
     });
-  } finally {
-    database.close();
-  }
+  });
 }

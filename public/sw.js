@@ -1,4 +1,4 @@
-const CACHE_NAME = "pokemon-tracker-shell-v4";
+const CACHE_NAME = "pokemon-tracker-shell-v5";
 const OFFLINE_URL = "/offline";
 const STATIC_ASSETS = [
   OFFLINE_URL,
