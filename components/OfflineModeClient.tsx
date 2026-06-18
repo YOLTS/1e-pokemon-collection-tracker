@@ -533,6 +533,9 @@ export function OfflineModeClient() {
             <span className={`rounded-full border px-3 py-1 font-black ${online ? "border-emerald-300/25 bg-emerald-300/10 text-emerald-100" : "border-cyan-300/25 bg-cyan-300/10 text-cyan-100"}`}>
               Local data
             </span>
+            <span className="rounded-md border border-fuchsia-300/50 bg-fuchsia-400/20 px-3 py-1 text-sm font-black text-fuchsia-50 shadow-glow">
+              OFFLINE_PARITY_BUILD_VISIBLE
+            </span>
             <span className="font-semibold text-slate-300">Last synced {formatTimestamp(snapshot.generatedAt)}</span>
             {pendingMutationCount > 0 ? (
               <span className="rounded-full border border-amber-300/25 bg-amber-300/10 px-3 py-1 font-black text-amber-100">
