@@ -4,11 +4,11 @@ import {
   OFFLINE_SNAPSHOT_SCHEMA_VERSION,
   type OfflineSnapshot,
 } from "@/lib/offline-snapshot";
-import {
-  type NewOfflineMutation,
-  type OfflineMutation,
-  type OfflineMutationStatus,
-  type OfflineSyncResult,
+import type {
+  NewOfflineMutation,
+  OfflineMutation,
+  OfflineMutationStatus,
+  OfflineSyncResult,
 } from "@/lib/offline-mutations";
 
 export const OFFLINE_DATABASE_NAME = "pokemon-collection-offline";

@@ -1,6 +1,5 @@
 "use client";
 
-import { loadOfflineSnapshot, saveOfflineSnapshot } from "@/lib/offline-storage";
 import {
   buildOfflineIntelligence,
   buildOfflineSetMetrics,
@@ -324,6 +323,7 @@ export function applyUpdateCardDetails(
 }
 
 export async function applyLocalMutationAndPersist(mutation: OfflineMutation) {
+  const { loadOfflineSnapshot, saveOfflineSnapshot } = await import("@/lib/offline-storage");
   const snapshot = await loadOfflineSnapshot();
   if (!snapshot) {
     throw new Error("No offline snapshot is available for local mutation application.");

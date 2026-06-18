@@ -41,26 +41,14 @@ export function CardArtwork({
     imageUrl ? "loading" : "error",
   );
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-  const [isPreviewClosing, setIsPreviewClosing] = useState(false);
   const [previewUrl, setPreviewUrl] = useState(imageUrlLarge || imageUrlSmall || "");
   const [previewError, setPreviewError] = useState(false);
   const thumbnailRef = useRef<HTMLImageElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const previewClosingRef = useRef(false);
 
   const closePreview = useCallback(() => {
-    if (previewClosingRef.current) {
-      return;
-    }
-
-    previewClosingRef.current = true;
-    setIsPreviewClosing(true);
-    window.setTimeout(() => {
-      setIsPreviewOpen(false);
-      setIsPreviewClosing(false);
-      previewClosingRef.current = false;
-      triggerRef.current?.focus();
-    }, 180);
+    setIsPreviewOpen(false);
+    setPreviewUrl("");
+    setPreviewError(false);
   }, []);
 
   useEffect(() => {
@@ -82,18 +70,13 @@ export function CardArtwork({
       return;
     }
 
-    const scrollY = window.scrollY;
     const previousBodyStyles = {
-      position: document.body.style.position,
-      top: document.body.style.top,
-      width: document.body.style.width,
       overflow: document.body.style.overflow,
     };
+    const previousDocumentOverflow = document.documentElement.style.overflow;
 
-    document.body.style.position = "fixed";
-    document.body.style.top = `-${scrollY}px`;
-    document.body.style.width = "100%";
     document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -105,11 +88,8 @@ export function CardArtwork({
 
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
-      document.body.style.position = previousBodyStyles.position;
-      document.body.style.top = previousBodyStyles.top;
-      document.body.style.width = previousBodyStyles.width;
       document.body.style.overflow = previousBodyStyles.overflow;
-      window.scrollTo(0, scrollY);
+      document.documentElement.style.overflow = previousDocumentOverflow;
     };
   }, [closePreview, isPreviewOpen]);
 
@@ -120,8 +100,6 @@ export function CardArtwork({
 
     setPreviewUrl(imageUrlLarge || imageUrlSmall || "");
     setPreviewError(false);
-    previewClosingRef.current = false;
-    setIsPreviewClosing(false);
     setIsPreviewOpen(true);
   }
 
@@ -130,7 +108,6 @@ export function CardArtwork({
 
   const artwork = (
     <button
-      ref={triggerRef}
       type="button"
       onClick={openPreview}
       disabled={!imageUrlSmall && !imageUrlLarge}
@@ -192,7 +169,7 @@ export function CardArtwork({
       {isPreviewOpen && typeof document !== "undefined"
         ? createPortal(
             <div
-              className={`card-preview-backdrop ${isPreviewClosing ? "is-closing" : ""}`}
+              className="card-preview-backdrop"
               role="presentation"
               onMouseDown={(event) => {
                 if (event.target === event.currentTarget) {
