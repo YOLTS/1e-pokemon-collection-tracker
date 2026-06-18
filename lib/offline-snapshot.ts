@@ -32,7 +32,7 @@ export type OfflineCard = {
 };
 
 export type OfflineCollectionItem = {
-  id: number;
+  id: number | string;
   variantId: number;
   status: string;
   condition: string;
@@ -96,7 +96,7 @@ export type OfflineSetMetric = {
 };
 
 export type OfflineRecentItem = {
-  id: number;
+  id: number | string;
   createdAt: string;
   condition: string;
   gradingCompany: string;
