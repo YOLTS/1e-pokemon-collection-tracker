@@ -369,6 +369,15 @@ export async function listPendingMutations() {
   });
 }
 
+export async function clearPendingMutationDebugStores() {
+  return withOfflineDatabase(async (database) => {
+    const transaction = database.transaction([pendingMutationsStore, syncResultsStore], "readwrite");
+    transaction.objectStore(pendingMutationsStore).clear();
+    transaction.objectStore(syncResultsStore).clear();
+    await transactionComplete(transaction);
+  });
+}
+
 async function updateMutationStatus(
   localMutationId: string,
   status: OfflineMutationStatus,

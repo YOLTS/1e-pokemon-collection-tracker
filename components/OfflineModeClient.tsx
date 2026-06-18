@@ -3,12 +3,13 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { CardArtwork } from "@/components/CardArtwork";
 import {
+  clearPendingMutationDebugStores,
   enqueueLatestMarketPriceMutation,
   enqueueLatestSetOwnedMutation,
   listPendingMutations,
   loadOfflineSnapshot,
 } from "@/lib/offline-storage";
-import { applyLocalMutationAndPersist } from "@/lib/offline-mutations";
+import { applyLocalMutationAndPersist, type OfflineMutation } from "@/lib/offline-mutations";
 import {
   getOfflineMarketPrice,
   getOfflinePrimaryCopy,
@@ -121,6 +122,8 @@ export function OfflineModeClient() {
   const [blockedMessage, setBlockedMessage] = useState("");
   const [localMessage, setLocalMessage] = useState("");
   const [pendingMutationCount, setPendingMutationCount] = useState(0);
+  const [debugPendingMutations, setDebugPendingMutations] = useState<OfflineMutation[]>([]);
+  const [debugMessage, setDebugMessage] = useState("");
   const [editingVariantId, setEditingVariantId] = useState<number | null>(null);
   const [editingPriceVariantId, setEditingPriceVariantId] = useState<number | null>(null);
   const [currentPath, setCurrentPath] = useState("/");
@@ -339,7 +342,26 @@ export function OfflineModeClient() {
     return (
       <section className="neon-panel rounded-lg p-6 text-slate-300">
         Loading offline snapshot...
-        <OfflineDebugPanel debugInfo={debugInfo} />
+        <OfflineDebugPanel
+          debugInfo={debugInfo}
+          pendingMutations={debugPendingMutations}
+          debugMessage={debugMessage}
+          onListPendingMutations={async () => {
+            const pendingMutations = await listPendingMutations();
+            setDebugPendingMutations(pendingMutations);
+            setDebugMessage(
+              pendingMutations.length === 0
+                ? "No pending local mutations."
+                : `${pendingMutations.length} pending local mutation${pendingMutations.length === 1 ? "" : "s"}.`,
+            );
+          }}
+          onClearPendingMutations={async () => {
+            await clearPendingMutationDebugStores();
+            setDebugPendingMutations([]);
+            setDebugMessage("Pending local mutations cleared. Snapshot was not changed.");
+            await refreshPendingMutationCount();
+          }}
+        />
       </section>
     );
   }
@@ -757,7 +779,19 @@ function OfflineStat({ label, value }: { label: string; value: string }) {
   );
 }
 
-function OfflineDebugPanel({ debugInfo }: { debugInfo: OfflineDebugInfo }) {
+function OfflineDebugPanel({
+  debugInfo,
+  pendingMutations = [],
+  debugMessage = "",
+  onListPendingMutations,
+  onClearPendingMutations,
+}: {
+  debugInfo: OfflineDebugInfo;
+  pendingMutations?: OfflineMutation[];
+  debugMessage?: string;
+  onListPendingMutations?: () => Promise<void>;
+  onClearPendingMutations?: () => Promise<void>;
+}) {
   return (
     <details className="mt-4 rounded-md border border-white/[0.08] bg-slate-950/60 px-3 py-2 text-xs text-slate-400">
       <summary className="cursor-pointer font-black uppercase tracking-widest text-slate-300">
@@ -808,6 +842,52 @@ function OfflineDebugPanel({ debugInfo }: { debugInfo: OfflineDebugInfo }) {
           <div className="sm:col-span-2">
             <dt className="font-bold text-slate-500">Error</dt>
             <dd className="break-all text-amber-100">{debugInfo.error}</dd>
+          </div>
+        ) : null}
+        {onListPendingMutations && onClearPendingMutations ? (
+          <div className="sm:col-span-2">
+            <dt className="font-bold text-slate-500">Pending mutation debug</dt>
+            <dd className="mt-2 flex flex-wrap gap-2">
+              <button
+                type="button"
+                className="btn-secondary rounded-md px-3 py-2 text-xs font-black"
+                onClick={() => {
+                  onListPendingMutations().catch(() => undefined);
+                }}
+              >
+                List pending
+              </button>
+              <button
+                type="button"
+                className="btn-secondary rounded-md px-3 py-2 text-xs font-black"
+                onClick={() => {
+                  if (window.confirm("Clear pending local mutations only? Offline snapshot data will be kept.")) {
+                    onClearPendingMutations().catch(() => undefined);
+                  }
+                }}
+              >
+                Clear pending
+              </button>
+            </dd>
+            {debugMessage ? <dd className="mt-2 text-cyan-100">{debugMessage}</dd> : null}
+            {pendingMutations.length > 0 ? (
+              <dd className="mt-2 max-h-56 overflow-auto rounded-md border border-white/[0.08] bg-slate-950/80 p-2">
+                <pre className="whitespace-pre-wrap break-all">
+                  {JSON.stringify(
+                    pendingMutations.map((mutation) => ({
+                      localMutationId: mutation.localMutationId,
+                      type: mutation.type,
+                      status: mutation.status,
+                      createdAt: mutation.createdAt,
+                      updatedAt: mutation.updatedAt,
+                      payload: mutation.payload,
+                    })),
+                    null,
+                    2,
+                  )}
+                </pre>
+              </dd>
+            ) : null}
           </div>
         ) : null}
       </dl>
