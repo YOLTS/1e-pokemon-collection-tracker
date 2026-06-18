@@ -6,16 +6,13 @@ import {
   clearPendingMutationDebugStores,
   enqueueLatestMarketPriceMutation,
   enqueueLatestSetOwnedMutation,
-  fetchAndSaveOfflineSnapshot,
   listAllPendingMutationDebugRecords,
   listOfflineMutationDebugEvents,
   listPendingMutations,
   loadOfflineSnapshot,
-  markMutationFailed,
-  markMutationSynced,
-  markMutationSyncing,
 } from "@/lib/offline-storage";
-import { applyLocalMutationAndPersist, type OfflineMutation, type OfflineSyncResult } from "@/lib/offline-mutations";
+import { syncPendingOfflineMutations } from "@/lib/offline-sync";
+import { applyLocalMutationAndPersist, type OfflineMutation } from "@/lib/offline-mutations";
 import {
   getOfflineMarketPrice,
   getOfflinePrimaryCopy,
@@ -358,93 +355,23 @@ export function OfflineModeClient() {
     setSyncStatus("syncing");
     setIsSyncing(true);
 
-    let syncResultsHandled = false;
-    let mutationsToSync: OfflineMutation[] = [];
-
     try {
-      mutationsToSync = (await listPendingMutations()).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-
-      if (mutationsToSync.length === 0) {
-        setSyncMessage("Synced just now");
-        setSyncStatus("synced");
-        return;
+      const result = await syncPendingOfflineMutations();
+      if (result.freshSnapshot) {
+        setSnapshot(result.freshSnapshot);
+      }
+      if (result.snapshotRefreshError) {
+        setDebugMessage(`Sync succeeded, but snapshot refresh failed: ${result.snapshotRefreshError}`);
       }
 
-      const syncingMutations = await Promise.all(
-        mutationsToSync.map((mutation) => markMutationSyncing(mutation.localMutationId)),
-      );
-
-      const response = await fetch("/api/sync-mutations", {
-        method: "POST",
-        cache: "no-store",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ mutations: syncingMutations }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Sync request failed with ${response.status}.`);
-      }
-
-      const body = (await response.json()) as { results?: OfflineSyncResult[] };
-      const results = Array.isArray(body.results) ? body.results : [];
-      const resultsById = new Map(results.map((result) => [result.localMutationId, result]));
-
-      await Promise.all(
-        syncingMutations.map(async (mutation) => {
-          const result = resultsById.get(mutation.localMutationId);
-
-          if (!result) {
-            await markMutationFailed(mutation.localMutationId, "Sync endpoint did not return a result.");
-            return;
-          }
-
-          if (result.status === "APPLIED" || result.status === "ALREADY_APPLIED") {
-            await markMutationSynced(mutation.localMutationId, result);
-            return;
-          }
-
-          await markMutationFailed(
-            mutation.localMutationId,
-            result.error ?? `Sync returned ${result.status}.`,
-          );
-        }),
-      );
-      syncResultsHandled = true;
-
-      const failedResults = results.filter((result) => result.status === "FAILED" || result.status === "CONFLICT");
-      const missingResults = syncingMutations.filter((mutation) => !resultsById.has(mutation.localMutationId));
-
-      if (failedResults.length === 0 && missingResults.length === 0) {
-        try {
-          const freshSnapshot = await fetchAndSaveOfflineSnapshot();
-          setSnapshot(freshSnapshot);
-        } catch (error) {
-          setDebugMessage(
-            error instanceof Error
-              ? `Sync succeeded, but snapshot refresh failed: ${error.message}`
-              : "Sync succeeded, but snapshot refresh failed.",
-          );
-        }
-        setSyncMessage("Synced just now");
+      if (result.status === "synced") {
+        setSyncMessage(result.message);
         setSyncStatus("synced");
       } else {
-        setSyncMessage("Sync failed - changes still saved locally");
+        setSyncMessage(result.message);
         setSyncStatus("failed");
       }
     } catch (error) {
-      if (!syncResultsHandled) {
-        await Promise.all(
-          mutationsToSync.map((mutation) =>
-            markMutationFailed(
-              mutation.localMutationId,
-              error instanceof Error ? error.message : "Manual sync failed.",
-            ).catch(() => undefined),
-          ),
-        );
-      }
       setSyncMessage("Sync failed - changes still saved locally");
       setSyncStatus("failed");
     } finally {
