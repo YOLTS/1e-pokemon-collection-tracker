@@ -61,6 +61,8 @@ type VariantTableClientProps = {
 type OwnedFilter = "all" | "owned" | "missing";
 type SortKey = "checklist" | "name" | "rarity" | "owned" | "value";
 type CardListNavigationState = {
+  sourceType?: "cards" | "set";
+  sourceLabel?: string;
   path: string;
   scrollY: number;
   query: string;
@@ -128,7 +130,7 @@ function readCardListNavigationState() {
     const parsedValue = JSON.parse(rawValue) as Partial<CardListNavigationState>;
     if (
       typeof parsedValue.path !== "string" ||
-      !parsedValue.path.startsWith("/cards") ||
+      (!parsedValue.path.startsWith("/cards") && !parsedValue.path.startsWith("/sets/")) ||
       typeof parsedValue.scrollY !== "number" ||
       typeof parsedValue.query !== "string" ||
       !isOwnedFilter(parsedValue.ownedFilter) ||
@@ -225,7 +227,11 @@ export function VariantTableClient({
   const visibleOwned = filteredVariants.filter(hasOwnedCopy).length;
 
   useEffect(() => {
-    if (restoredNavigationState || typeof window === "undefined" || window.location.pathname !== "/cards") {
+    if (
+      restoredNavigationState ||
+      typeof window === "undefined" ||
+      (window.location.pathname !== "/cards" && !window.location.pathname.startsWith("/sets/"))
+    ) {
       return;
     }
 
@@ -263,19 +269,25 @@ export function VariantTableClient({
     return () => window.clearTimeout(timeout);
   }, [filteredVariants, restoreTarget]);
 
-  function saveCardListNavigationState(selectedVariantId: number) {
-    if (typeof window === "undefined" || window.location.pathname !== "/cards") {
+  function saveCardListNavigationState(variant: VariantRow) {
+    if (
+      typeof window === "undefined" ||
+      (window.location.pathname !== "/cards" && !window.location.pathname.startsWith("/sets/"))
+    ) {
       return;
     }
 
+    const sourceType = window.location.pathname.startsWith("/sets/") ? "set" : "cards";
     const state: CardListNavigationState = {
+      sourceType,
+      sourceLabel: sourceType === "set" ? variant.card.set.name : undefined,
       path: `${window.location.pathname}${window.location.search}`,
       scrollY: window.scrollY,
       query,
       ownedFilter,
       rarityFilter,
       sortKey,
-      selectedVariantId,
+      selectedVariantId: variant.id,
       savedAt: new Date().toISOString(),
     };
 
@@ -457,7 +469,7 @@ export function VariantTableClient({
                 <Link
                   href={`/cards/${variant.id}`}
                   className={`${owned ? "btn-primary" : "btn-secondary"} flex-1 whitespace-nowrap rounded-md px-3 py-2 text-center text-xs font-black transition`}
-                  onClick={() => saveCardListNavigationState(variant.id)}
+                  onClick={() => saveCardListNavigationState(variant)}
                 >
                   View details
                 </Link>
