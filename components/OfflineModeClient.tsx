@@ -233,6 +233,24 @@ export function OfflineModeClient() {
     return pendingMutations.length;
   }
 
+  async function listPendingMutationsForDebug() {
+    const pendingMutations = await listPendingMutations();
+    setDebugPendingMutations(pendingMutations);
+    setDebugEnqueueEvents(listOfflineMutationDebugEvents());
+    setDebugMessage(
+      pendingMutations.length === 0
+        ? "No pending local mutations."
+        : `${pendingMutations.length} pending local mutation${pendingMutations.length === 1 ? "" : "s"}.`,
+    );
+  }
+
+  async function clearPendingMutationsForDebug() {
+    await clearPendingMutationDebugStores();
+    setDebugPendingMutations([]);
+    setDebugMessage("Pending local mutations cleared. Snapshot was not changed.");
+    await refreshPendingMutationCount();
+  }
+
   async function toggleOfflineOwned(variant: OfflineVariant, owned: boolean) {
     if (!snapshot || editingVariantId !== null) {
       return;
@@ -366,22 +384,11 @@ export function OfflineModeClient() {
         <OfflineDebugPanel
           debugInfo={debugInfo}
           pendingMutations={debugPendingMutations}
+          pendingCountEvents={debugPendingCountEvents}
+          enqueueEvents={debugEnqueueEvents}
           debugMessage={debugMessage}
-          onListPendingMutations={async () => {
-            const pendingMutations = await listPendingMutations();
-            setDebugPendingMutations(pendingMutations);
-            setDebugMessage(
-              pendingMutations.length === 0
-                ? "No pending local mutations."
-                : `${pendingMutations.length} pending local mutation${pendingMutations.length === 1 ? "" : "s"}.`,
-            );
-          }}
-          onClearPendingMutations={async () => {
-            await clearPendingMutationDebugStores();
-            setDebugPendingMutations([]);
-            setDebugMessage("Pending local mutations cleared. Snapshot was not changed.");
-            await refreshPendingMutationCount();
-          }}
+          onListPendingMutations={listPendingMutationsForDebug}
+          onClearPendingMutations={clearPendingMutationsForDebug}
         />
       </section>
     );
@@ -402,22 +409,8 @@ export function OfflineModeClient() {
           pendingCountEvents={debugPendingCountEvents}
           enqueueEvents={debugEnqueueEvents}
           debugMessage={debugMessage}
-          onListPendingMutations={async () => {
-            const pendingMutations = await listPendingMutations();
-            setDebugPendingMutations(pendingMutations);
-            setDebugEnqueueEvents(listOfflineMutationDebugEvents());
-            setDebugMessage(
-              pendingMutations.length === 0
-                ? "No pending local mutations."
-                : `${pendingMutations.length} pending local mutation${pendingMutations.length === 1 ? "" : "s"}.`,
-            );
-          }}
-          onClearPendingMutations={async () => {
-            await clearPendingMutationDebugStores();
-            setDebugPendingMutations([]);
-            setDebugMessage("Pending local mutations cleared. Snapshot was not changed.");
-            await refreshPendingMutationCount();
-          }}
+          onListPendingMutations={listPendingMutationsForDebug}
+          onClearPendingMutations={clearPendingMutationsForDebug}
         />
       </section>
     );
@@ -431,7 +424,15 @@ export function OfflineModeClient() {
         <p className="mt-3 max-w-2xl text-slate-400">
           Offline snapshot unavailable. Open the app online once before using offline mode.
         </p>
-        <OfflineDebugPanel debugInfo={debugInfo} />
+        <OfflineDebugPanel
+          debugInfo={debugInfo}
+          pendingMutations={debugPendingMutations}
+          pendingCountEvents={debugPendingCountEvents}
+          enqueueEvents={debugEnqueueEvents}
+          debugMessage={debugMessage}
+          onListPendingMutations={listPendingMutationsForDebug}
+          onClearPendingMutations={clearPendingMutationsForDebug}
+        />
       </section>
     );
   }
@@ -489,7 +490,15 @@ export function OfflineModeClient() {
             {routeFallbackMessage}
           </p>
         ) : null}
-        <OfflineDebugPanel debugInfo={debugInfo} />
+        <OfflineDebugPanel
+          debugInfo={debugInfo}
+          pendingMutations={debugPendingMutations}
+          pendingCountEvents={debugPendingCountEvents}
+          enqueueEvents={debugEnqueueEvents}
+          debugMessage={debugMessage}
+          onListPendingMutations={listPendingMutationsForDebug}
+          onClearPendingMutations={clearPendingMutationsForDebug}
+        />
       </section>
 
       {effectiveView.name === "dashboard" ? (
@@ -879,18 +888,6 @@ function OfflineDebugPanel({
           <dt className="font-bold text-slate-500">Current path</dt>
           <dd className="break-all">{debugInfo.currentPath}</dd>
         </div>
-        {debugInfo.serviceWorkerDebug ? (
-          <div className="sm:col-span-2">
-            <dt className="font-bold text-slate-500">SW debug</dt>
-            <dd className="break-all">{debugInfo.serviceWorkerDebug}</dd>
-          </div>
-        ) : null}
-        {debugInfo.error ? (
-          <div className="sm:col-span-2">
-            <dt className="font-bold text-slate-500">Error</dt>
-            <dd className="break-all text-amber-100">{debugInfo.error}</dd>
-          </div>
-        ) : null}
         {onListPendingMutations && onClearPendingMutations ? (
           <div className="sm:col-span-2">
             <dt className="font-bold text-slate-500">Pending mutation debug</dt>
@@ -958,6 +955,18 @@ function OfflineDebugPanel({
                 <pre className="whitespace-pre-wrap break-all">{JSON.stringify(enqueueEvents, null, 2)}</pre>
               </dd>
             ) : null}
+          </div>
+        ) : null}
+        {debugInfo.serviceWorkerDebug ? (
+          <div className="sm:col-span-2">
+            <dt className="font-bold text-slate-500">SW debug</dt>
+            <dd className="break-all">{debugInfo.serviceWorkerDebug}</dd>
+          </div>
+        ) : null}
+        {debugInfo.error ? (
+          <div className="sm:col-span-2">
+            <dt className="font-bold text-slate-500">Error</dt>
+            <dd className="break-all text-amber-100">{debugInfo.error}</dd>
           </div>
         ) : null}
       </dl>
