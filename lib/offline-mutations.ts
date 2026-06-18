@@ -87,6 +87,7 @@ export type NewOfflineMutation<TPayload extends OfflineMutationPayload = Offline
   payload: TPayload;
   baseSnapshotGeneratedAt?: string | null;
   baseServerUpdatedAt?: string | null;
+  debugContext?: string;
 };
 
 export type OfflineSyncResult = {

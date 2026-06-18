@@ -20,6 +20,16 @@ const metadataStore = "metadata";
 const pendingMutationsStore = "pendingMutations";
 const syncResultsStore = "syncResults";
 const latestSnapshotKey = "latest";
+const mutationDebugLogKey = "pokemonOfflineMutationDebugLog";
+
+type OfflineMutationDebugEvent = {
+  at: string;
+  event: string;
+  type: string;
+  localMutationId: string;
+  variantId: number | null;
+  context: string | null;
+};
 
 function createPendingMutationsStore(database: IDBDatabase) {
   const store = database.createObjectStore(pendingMutationsStore, {
@@ -87,6 +97,42 @@ function createLocalMutationId() {
   }
 
   return `local-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function payloadVariantId(payload: unknown) {
+  if (
+    typeof payload === "object" &&
+    payload !== null &&
+    "variantId" in payload &&
+    typeof payload.variantId === "number"
+  ) {
+    return payload.variantId;
+  }
+
+  return null;
+}
+
+function recordMutationDebugEvent(event: OfflineMutationDebugEvent) {
+  try {
+    const existingLog = JSON.parse(window.localStorage.getItem(mutationDebugLogKey) ?? "[]") as unknown;
+    const existingEvents = Array.isArray(existingLog) ? existingLog : [];
+    window.localStorage.setItem(
+      mutationDebugLogKey,
+      JSON.stringify([...existingEvents, event].slice(-30)),
+    );
+    console.info("[offline-mutation]", event);
+  } catch {
+    // Mutation diagnostics are best-effort only.
+  }
+}
+
+export function listOfflineMutationDebugEvents() {
+  try {
+    const existingLog = JSON.parse(window.localStorage.getItem(mutationDebugLogKey) ?? "[]") as unknown;
+    return Array.isArray(existingLog) ? (existingLog as OfflineMutationDebugEvent[]) : [];
+  } catch {
+    return [];
+  }
 }
 
 function transactionComplete(transaction: IDBTransaction) {
@@ -241,6 +287,15 @@ export async function enqueueMutation(newMutation: NewOfflineMutation) {
     await transactionComplete(transaction);
   });
 
+  recordMutationDebugEvent({
+    at: now,
+    event: "enqueueMutation",
+    type: mutation.type,
+    localMutationId: mutation.localMutationId,
+    variantId: payloadVariantId(mutation.payload),
+    context: newMutation.debugContext ?? null,
+  });
+
   return mutation;
 }
 
@@ -291,6 +346,14 @@ export async function enqueueLatestSetOwnedMutation(
       request.onerror = () => reject(request.error);
       transaction.oncomplete = () => {
         if (mutation) {
+          recordMutationDebugEvent({
+            at: now,
+            event: "enqueueLatestSetOwnedMutation",
+            type: mutation.type,
+            localMutationId: mutation.localMutationId,
+            variantId: payloadVariantId(mutation.payload),
+            context: newMutation.debugContext ?? null,
+          });
           resolve(mutation);
         }
       };
@@ -347,6 +410,14 @@ export async function enqueueLatestMarketPriceMutation(
       request.onerror = () => reject(request.error);
       transaction.oncomplete = () => {
         if (mutation) {
+          recordMutationDebugEvent({
+            at: now,
+            event: "enqueueLatestMarketPriceMutation",
+            type: mutation.type,
+            localMutationId: mutation.localMutationId,
+            variantId: payloadVariantId(mutation.payload),
+            context: newMutation.debugContext ?? null,
+          });
           resolve(mutation);
         }
       };

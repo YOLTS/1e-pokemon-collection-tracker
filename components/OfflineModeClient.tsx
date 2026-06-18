@@ -6,6 +6,7 @@ import {
   clearPendingMutationDebugStores,
   enqueueLatestMarketPriceMutation,
   enqueueLatestSetOwnedMutation,
+  listOfflineMutationDebugEvents,
   listPendingMutations,
   loadOfflineSnapshot,
 } from "@/lib/offline-storage";
@@ -124,6 +125,8 @@ export function OfflineModeClient() {
   const [pendingMutationCount, setPendingMutationCount] = useState(0);
   const [debugPendingMutations, setDebugPendingMutations] = useState<OfflineMutation[]>([]);
   const [debugMessage, setDebugMessage] = useState("");
+  const [debugPendingCountEvents, setDebugPendingCountEvents] = useState<string[]>([]);
+  const [debugEnqueueEvents, setDebugEnqueueEvents] = useState<ReturnType<typeof listOfflineMutationDebugEvents>>([]);
   const [editingVariantId, setEditingVariantId] = useState<number | null>(null);
   const [editingPriceVariantId, setEditingPriceVariantId] = useState<number | null>(null);
   const [currentPath, setCurrentPath] = useState("/");
@@ -166,15 +169,25 @@ export function OfflineModeClient() {
 
     navigator.serviceWorker?.addEventListener("controllerchange", handleControllerChange);
 
-    async function refreshPendingMutationCount() {
+    async function refreshPendingMutationCountOnLoad() {
       try {
         const pendingMutations = await listPendingMutations();
         if (!cancelled) {
           setPendingMutationCount(pendingMutations.length);
+          setDebugPendingMutations(pendingMutations);
+          setDebugPendingCountEvents((events) => [
+            ...events,
+            `${new Date().toISOString()} initial load count=${pendingMutations.length}`,
+          ].slice(-10));
+          setDebugEnqueueEvents(listOfflineMutationDebugEvents());
         }
       } catch {
         if (!cancelled) {
           setPendingMutationCount(0);
+          setDebugPendingCountEvents((events) => [
+            ...events,
+            `${new Date().toISOString()} initial load count failed`,
+          ].slice(-10));
         }
       }
     }
@@ -188,7 +201,7 @@ export function OfflineModeClient() {
         setLoadError(error instanceof Error ? error.message : "Unknown IndexedDB error");
         setStatus("error");
       });
-    refreshPendingMutationCount();
+    refreshPendingMutationCountOnLoad();
 
     return () => {
       cancelled = true;
@@ -211,6 +224,12 @@ export function OfflineModeClient() {
   async function refreshPendingMutationCount() {
     const pendingMutations = await listPendingMutations();
     setPendingMutationCount(pendingMutations.length);
+    setDebugPendingMutations(pendingMutations);
+    setDebugPendingCountEvents((events) => [
+      ...events,
+      `${new Date().toISOString()} refresh count=${pendingMutations.length}`,
+    ].slice(-10));
+    setDebugEnqueueEvents(listOfflineMutationDebugEvents());
     return pendingMutations.length;
   }
 
@@ -227,6 +246,7 @@ export function OfflineModeClient() {
     try {
       const mutation = await enqueueLatestSetOwnedMutation({
         type: "SET_OWNED",
+        debugContext: "OfflineModeClient.toggleOfflineOwned",
         baseSnapshotGeneratedAt: snapshot.generatedAt,
         payload: {
           variantId: variant.id,
@@ -262,6 +282,7 @@ export function OfflineModeClient() {
       const oldMarketPrice = getOfflineMarketPrice(variant);
       const mutation = await enqueueLatestMarketPriceMutation({
         type: "UPDATE_MARKET_PRICE",
+        debugContext: "OfflineModeClient.updateOfflineMarketPrice",
         baseSnapshotGeneratedAt: snapshot.generatedAt,
         payload: {
           variantId: variant.id,
@@ -375,7 +396,29 @@ export function OfflineModeClient() {
           Offline snapshot unavailable. Open the app online once before using offline mode.
         </p>
         {loadError ? <p className="mt-3 text-sm text-amber-100">{loadError}</p> : null}
-        <OfflineDebugPanel debugInfo={debugInfo} />
+        <OfflineDebugPanel
+          debugInfo={debugInfo}
+          pendingMutations={debugPendingMutations}
+          pendingCountEvents={debugPendingCountEvents}
+          enqueueEvents={debugEnqueueEvents}
+          debugMessage={debugMessage}
+          onListPendingMutations={async () => {
+            const pendingMutations = await listPendingMutations();
+            setDebugPendingMutations(pendingMutations);
+            setDebugEnqueueEvents(listOfflineMutationDebugEvents());
+            setDebugMessage(
+              pendingMutations.length === 0
+                ? "No pending local mutations."
+                : `${pendingMutations.length} pending local mutation${pendingMutations.length === 1 ? "" : "s"}.`,
+            );
+          }}
+          onClearPendingMutations={async () => {
+            await clearPendingMutationDebugStores();
+            setDebugPendingMutations([]);
+            setDebugMessage("Pending local mutations cleared. Snapshot was not changed.");
+            await refreshPendingMutationCount();
+          }}
+        />
       </section>
     );
   }
@@ -782,12 +825,16 @@ function OfflineStat({ label, value }: { label: string; value: string }) {
 function OfflineDebugPanel({
   debugInfo,
   pendingMutations = [],
+  pendingCountEvents = [],
+  enqueueEvents = [],
   debugMessage = "",
   onListPendingMutations,
   onClearPendingMutations,
 }: {
   debugInfo: OfflineDebugInfo;
   pendingMutations?: OfflineMutation[];
+  pendingCountEvents?: string[];
+  enqueueEvents?: ReturnType<typeof listOfflineMutationDebugEvents>;
   debugMessage?: string;
   onListPendingMutations?: () => Promise<void>;
   onClearPendingMutations?: () => Promise<void>;
@@ -870,14 +917,31 @@ function OfflineDebugPanel({
               </button>
             </dd>
             {debugMessage ? <dd className="mt-2 text-cyan-100">{debugMessage}</dd> : null}
+            {pendingCountEvents.length > 0 ? (
+              <dd className="mt-2 rounded-md border border-white/[0.08] bg-slate-950/80 p-2">
+                <p className="font-bold text-slate-500">Pending count events</p>
+                <ul className="mt-1 space-y-1">
+                  {pendingCountEvents.map((event) => (
+                    <li key={event}>{event}</li>
+                  ))}
+                </ul>
+              </dd>
+            ) : null}
             {pendingMutations.length > 0 ? (
               <dd className="mt-2 max-h-56 overflow-auto rounded-md border border-white/[0.08] bg-slate-950/80 p-2">
+                <p className="mb-2 font-bold text-slate-500">Pending mutations</p>
                 <pre className="whitespace-pre-wrap break-all">
                   {JSON.stringify(
                     pendingMutations.map((mutation) => ({
                       localMutationId: mutation.localMutationId,
                       type: mutation.type,
                       status: mutation.status,
+                      variantId:
+                        typeof mutation.payload === "object" &&
+                        mutation.payload !== null &&
+                        "variantId" in mutation.payload
+                          ? mutation.payload.variantId
+                          : null,
                       createdAt: mutation.createdAt,
                       updatedAt: mutation.updatedAt,
                       payload: mutation.payload,
@@ -886,6 +950,12 @@ function OfflineDebugPanel({
                     2,
                   )}
                 </pre>
+              </dd>
+            ) : null}
+            {enqueueEvents.length > 0 ? (
+              <dd className="mt-2 max-h-56 overflow-auto rounded-md border border-white/[0.08] bg-slate-950/80 p-2">
+                <p className="mb-2 font-bold text-slate-500">Enqueue call log</p>
+                <pre className="whitespace-pre-wrap break-all">{JSON.stringify(enqueueEvents, null, 2)}</pre>
               </dd>
             ) : null}
           </div>
