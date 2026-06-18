@@ -14,13 +14,30 @@ import type {
 } from "@/lib/offline-mutations";
 
 export const OFFLINE_DATABASE_NAME = "pokemon-collection-offline";
-export const OFFLINE_DATABASE_VERSION = 2;
+export const OFFLINE_DATABASE_VERSION = 3;
 const snapshotStore = "snapshots";
 const metadataStore = "metadata";
 const pendingMutationsStore = "pendingMutations";
 const syncResultsStore = "syncResults";
+const cardImageBlobsStore = "cardImageBlobs";
 const latestSnapshotKey = "latest";
 const mutationDebugLogKey = "pokemonOfflineMutationDebugLog";
+
+type CardImageBlobRecord = {
+  cardId: number;
+  url: string;
+  blob: Blob | null;
+  sizeBytes: number;
+  cachedAt: string;
+  status: "CACHED" | "FAILED";
+  error: string | null;
+};
+
+export type CachedImageStats = {
+  cachedCount: number;
+  failedCount: number;
+  totalBytes: number;
+};
 
 type OfflineMutationDebugEvent = {
   at: string;
@@ -58,6 +75,14 @@ function openOfflineDatabase() {
         database.createObjectStore(syncResultsStore, {
           keyPath: "localMutationId",
         });
+      }
+      if (!database.objectStoreNames.contains(cardImageBlobsStore)) {
+        const store = database.createObjectStore(cardImageBlobsStore, {
+          keyPath: "cardId",
+        });
+        store.createIndex("url", "url", { unique: false });
+        store.createIndex("status", "status", { unique: false });
+        store.createIndex("cachedAt", "cachedAt", { unique: false });
       }
     };
 
@@ -148,6 +173,174 @@ function requestResult<T>(request: IDBRequest<T>) {
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
   });
+}
+
+function isCardImageBlobRecord(value: unknown): value is CardImageBlobRecord {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+
+  const candidate = value as Partial<CardImageBlobRecord>;
+
+  return (
+    typeof candidate.cardId === "number" &&
+    typeof candidate.url === "string" &&
+    typeof candidate.sizeBytes === "number" &&
+    typeof candidate.cachedAt === "string" &&
+    (candidate.status === "CACHED" || candidate.status === "FAILED")
+  );
+}
+
+export async function getCachedCardThumbnailBlob(cardId: number) {
+  return withOfflineDatabase(async (database) => {
+    const transaction = database.transaction(cardImageBlobsStore, "readonly");
+    const request = transaction.objectStore(cardImageBlobsStore).get(cardId);
+    const record = await requestResult(request);
+
+    return isCardImageBlobRecord(record) && record.status === "CACHED" && record.blob
+      ? record.blob
+      : null;
+  });
+}
+
+export async function getCachedCardThumbnailObjectUrl(cardId: number) {
+  const blob = await getCachedCardThumbnailBlob(cardId);
+  return blob ? URL.createObjectURL(blob) : null;
+}
+
+export async function cacheCardThumbnail(cardId: number, imageUrlSmall?: string | null) {
+  if (!imageUrlSmall) {
+    return null;
+  }
+
+  const existingRecord = await withOfflineDatabase(async (database) => {
+    const transaction = database.transaction(cardImageBlobsStore, "readonly");
+    const request = transaction.objectStore(cardImageBlobsStore).get(cardId);
+    return await requestResult(request);
+  });
+
+  if (
+    isCardImageBlobRecord(existingRecord) &&
+    existingRecord.url === imageUrlSmall &&
+    (existingRecord.status === "FAILED" || existingRecord.blob)
+  ) {
+    return existingRecord;
+  }
+
+  const cachedAt = new Date().toISOString();
+
+  try {
+    const response = await fetch(imageUrlSmall, {
+      cache: "force-cache",
+      mode: "cors",
+    });
+
+    if (!response.ok) {
+      throw new Error(`Image request failed with ${response.status}.`);
+    }
+
+    const blob = await response.blob();
+    const record: CardImageBlobRecord = {
+      cardId,
+      url: imageUrlSmall,
+      blob,
+      sizeBytes: blob.size,
+      cachedAt,
+      status: "CACHED",
+      error: null,
+    };
+
+    await withOfflineDatabase(async (database) => {
+      const transaction = database.transaction(cardImageBlobsStore, "readwrite");
+      transaction.objectStore(cardImageBlobsStore).put(record);
+      await transactionComplete(transaction);
+    });
+
+    return record;
+  } catch (error) {
+    const record: CardImageBlobRecord = {
+      cardId,
+      url: imageUrlSmall,
+      blob: null,
+      sizeBytes: 0,
+      cachedAt,
+      status: "FAILED",
+      error: error instanceof Error ? error.message : "Image cache request failed.",
+    };
+
+    await withOfflineDatabase(async (database) => {
+      const transaction = database.transaction(cardImageBlobsStore, "readwrite");
+      transaction.objectStore(cardImageBlobsStore).put(record);
+      await transactionComplete(transaction);
+    });
+
+    throw new Error(record.error ?? "Image cache request failed.");
+  }
+}
+
+export async function listCachedImageStats(): Promise<CachedImageStats> {
+  return withOfflineDatabase(async (database) => {
+    const transaction = database.transaction(cardImageBlobsStore, "readonly");
+    const request = transaction.objectStore(cardImageBlobsStore).getAll();
+    const records = (await requestResult(request)).filter(isCardImageBlobRecord);
+
+    return records.reduce<CachedImageStats>(
+      (stats, record) => ({
+        cachedCount: stats.cachedCount + (record.status === "CACHED" ? 1 : 0),
+        failedCount: stats.failedCount + (record.status === "FAILED" ? 1 : 0),
+        totalBytes: stats.totalBytes + (record.status === "CACHED" ? record.sizeBytes : 0),
+      }),
+      { cachedCount: 0, failedCount: 0, totalBytes: 0 },
+    );
+  });
+}
+
+export async function clearCachedImagesDebug() {
+  return withOfflineDatabase(async (database) => {
+    const transaction = database.transaction(cardImageBlobsStore, "readwrite");
+    transaction.objectStore(cardImageBlobsStore).clear();
+    await transactionComplete(transaction);
+  });
+}
+
+export async function warmOwnedCardThumbnailCache(snapshot: OfflineSnapshot) {
+  const ownedThumbnailTargets = Array.from(
+    snapshot.variants.reduce((targets, variant) => {
+      if (
+        variant.card.imageUrlSmall &&
+        variant.ownedItems.some((item) => item.status === "OWNED") &&
+        !targets.has(variant.card.id)
+      ) {
+        targets.set(variant.card.id, variant.card.imageUrlSmall);
+      }
+
+      return targets;
+    }, new Map<number, string>()),
+  );
+
+  const batchSize = 4;
+  const failures: string[] = [];
+
+  for (let index = 0; index < ownedThumbnailTargets.length; index += batchSize) {
+    const batch = ownedThumbnailTargets.slice(index, index + batchSize);
+    const results = await Promise.allSettled(
+      batch.map(([cardId, imageUrlSmall]) => cacheCardThumbnail(cardId, imageUrlSmall)),
+    );
+
+    results.forEach((result) => {
+      if (result.status === "rejected") {
+        failures.push(result.reason instanceof Error ? result.reason.message : "Image cache request failed.");
+      }
+    });
+
+    await new Promise((resolve) => window.setTimeout(resolve, 75));
+  }
+
+  return {
+    attempted: ownedThumbnailTargets.length,
+    failed: failures.length,
+    failures: failures.slice(0, 5),
+  };
 }
 
 function isOfflineMutation(value: unknown): value is OfflineMutation {

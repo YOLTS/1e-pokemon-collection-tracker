@@ -3,13 +3,17 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { CardArtwork } from "@/components/CardArtwork";
 import {
+  clearCachedImagesDebug,
   clearPendingMutationDebugStores,
   enqueueLatestMarketPriceMutation,
   enqueueLatestSetOwnedMutation,
+  getCachedCardThumbnailObjectUrl,
   listAllPendingMutationDebugRecords,
+  listCachedImageStats,
   listOfflineMutationDebugEvents,
   listPendingMutations,
   loadOfflineSnapshot,
+  type CachedImageStats,
 } from "@/lib/offline-storage";
 import { syncPendingOfflineMutations } from "@/lib/offline-sync";
 import { applyLocalMutationAndPersist, type OfflineMutation } from "@/lib/offline-mutations";
@@ -48,6 +52,7 @@ type OfflineDebugInfo = {
   status: OfflineLoadStatus;
   serviceWorkerControlled: boolean;
   serviceWorkerDebug: string;
+  imageCacheStats: CachedImageStats;
   error?: string;
 };
 
@@ -159,6 +164,11 @@ export function OfflineModeClient() {
   const [loadError, setLoadError] = useState("");
   const [serviceWorkerDebug, setServiceWorkerDebug] = useState("");
   const [serviceWorkerControlled, setServiceWorkerControlled] = useState(false);
+  const [imageCacheStats, setImageCacheStats] = useState<CachedImageStats>({
+    cachedCount: 0,
+    failedCount: 0,
+    totalBytes: 0,
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -231,6 +241,7 @@ export function OfflineModeClient() {
         setStatus("error");
       });
     refreshPendingMutationCountOnLoad();
+    refreshImageCacheStats().catch(() => undefined);
 
     return () => {
       cancelled = true;
@@ -268,6 +279,12 @@ export function OfflineModeClient() {
     return pendingMutations.length;
   }
 
+  async function refreshImageCacheStats() {
+    const stats = await listCachedImageStats();
+    setImageCacheStats(stats);
+    return stats;
+  }
+
   async function listPendingMutationsForDebug() {
     const pendingMutations = await listPendingMutations();
     const rawPendingMutations = await listAllPendingMutationDebugRecords();
@@ -287,6 +304,12 @@ export function OfflineModeClient() {
     setDebugRawPendingMutations([]);
     setDebugMessage("Pending local mutations cleared. Snapshot was not changed.");
     await refreshPendingMutationCount();
+  }
+
+  async function clearCachedImagesForDebug() {
+    await clearCachedImagesDebug();
+    setDebugMessage("Cached card thumbnail images cleared. Snapshot and pending edits were not changed.");
+    await refreshImageCacheStats();
   }
 
   async function toggleOfflineOwned(variant: OfflineVariant, owned: boolean) {
@@ -448,6 +471,7 @@ export function OfflineModeClient() {
     status,
     serviceWorkerControlled,
     serviceWorkerDebug,
+    imageCacheStats,
     error: loadError || undefined,
   };
 
@@ -464,6 +488,7 @@ export function OfflineModeClient() {
           debugMessage={debugMessage}
           onListPendingMutations={listPendingMutationsForDebug}
           onClearPendingMutations={clearPendingMutationsForDebug}
+          onClearCachedImages={clearCachedImagesForDebug}
         />
       </section>
     );
@@ -487,6 +512,7 @@ export function OfflineModeClient() {
           debugMessage={debugMessage}
           onListPendingMutations={listPendingMutationsForDebug}
           onClearPendingMutations={clearPendingMutationsForDebug}
+          onClearCachedImages={clearCachedImagesForDebug}
         />
       </section>
     );
@@ -509,6 +535,7 @@ export function OfflineModeClient() {
           debugMessage={debugMessage}
           onListPendingMutations={listPendingMutationsForDebug}
           onClearPendingMutations={clearPendingMutationsForDebug}
+          onClearCachedImages={clearCachedImagesForDebug}
         />
       </section>
     );
@@ -600,6 +627,7 @@ export function OfflineModeClient() {
           debugMessage={debugMessage}
           onListPendingMutations={listPendingMutationsForDebug}
           onClearPendingMutations={clearPendingMutationsForDebug}
+          onClearCachedImages={clearCachedImagesForDebug}
         />
       </section>
 
@@ -895,6 +923,43 @@ function OfflineCards({
   }, [ownedFilter, rarityFilter, sortKey, variants]);
 
   const visibleOwned = displayedVariants.filter(hasOfflineOwnedCopy).length;
+  const [cachedThumbnailUrls, setCachedThumbnailUrls] = useState<Record<number, string>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    let activeObjectUrls: string[] = [];
+
+    async function loadCachedThumbnails() {
+      const entries = await Promise.all(
+        displayedVariants.map(async (variant) => {
+          const objectUrl = await getCachedCardThumbnailObjectUrl(variant.card.id).catch(() => null);
+          return [variant.card.id, objectUrl] as const;
+        }),
+      );
+      const nextObjectUrls = entries
+        .map(([, objectUrl]) => objectUrl)
+        .filter((objectUrl): objectUrl is string => Boolean(objectUrl));
+
+      if (cancelled) {
+        nextObjectUrls.forEach((objectUrl) => URL.revokeObjectURL(objectUrl));
+        return;
+      }
+
+      activeObjectUrls = nextObjectUrls;
+      setCachedThumbnailUrls(
+        Object.fromEntries(
+          entries.filter((entry): entry is readonly [number, string] => Boolean(entry[1])),
+        ),
+      );
+    }
+
+    loadCachedThumbnails().catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+      activeObjectUrls.forEach((objectUrl) => URL.revokeObjectURL(objectUrl));
+    };
+  }, [displayedVariants]);
 
   return (
     <section className="neon-panel overflow-hidden rounded-lg">
@@ -998,8 +1063,8 @@ function OfflineCards({
                   setName={variant.card.set.name}
                   setSymbol={variant.card.set.symbol}
                   setColor={variant.card.set.color}
-                  imageUrlSmall={variant.card.imageUrlSmall}
-                  imageUrlLarge={variant.card.imageUrlLarge}
+                  imageUrlSmall={cachedThumbnailUrls[variant.card.id] ?? null}
+                  imageUrlLarge={cachedThumbnailUrls[variant.card.id] ?? null}
                   imageSource={variant.card.imageSource}
                   imageMatchStatus={variant.card.imageMatchStatus}
                   owned={owned}
@@ -1086,6 +1151,33 @@ function OfflineCardDetail({
   const primaryCopy = getOfflinePrimaryCopy(variant);
   const notes = primaryCopy?.notes || variant.notes;
   const marketPrice = getOfflineMarketPrice(variant);
+  const [cachedThumbnailUrl, setCachedThumbnailUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let objectUrl: string | null = null;
+    let cancelled = false;
+
+    getCachedCardThumbnailObjectUrl(variant.card.id)
+      .then((cachedObjectUrl) => {
+        if (cancelled) {
+          if (cachedObjectUrl) {
+            URL.revokeObjectURL(cachedObjectUrl);
+          }
+          return;
+        }
+
+        objectUrl = cachedObjectUrl;
+        setCachedThumbnailUrl(cachedObjectUrl);
+      })
+      .catch(() => setCachedThumbnailUrl(null));
+
+    return () => {
+      cancelled = true;
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+  }, [variant.card.id]);
 
   function handlePriceSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1110,8 +1202,8 @@ function OfflineCardDetail({
             setName={variant.card.set.name}
             setSymbol={variant.card.set.symbol}
             setColor={variant.card.set.color}
-            imageUrlSmall={variant.card.imageUrlSmall}
-            imageUrlLarge={variant.card.imageUrlLarge}
+            imageUrlSmall={cachedThumbnailUrl}
+            imageUrlLarge={cachedThumbnailUrl}
             imageSource={variant.card.imageSource}
             imageMatchStatus={variant.card.imageMatchStatus}
             owned={owned}
@@ -1199,6 +1291,7 @@ function OfflineDebugPanel({
   debugMessage = "",
   onListPendingMutations,
   onClearPendingMutations,
+  onClearCachedImages,
 }: {
   debugInfo: OfflineDebugInfo;
   pendingMutations?: OfflineMutation[];
@@ -1208,6 +1301,7 @@ function OfflineDebugPanel({
   debugMessage?: string;
   onListPendingMutations?: () => Promise<void>;
   onClearPendingMutations?: () => Promise<void>;
+  onClearCachedImages?: () => Promise<void>;
 }) {
   return (
     <details className="mt-4 rounded-md border border-white/[0.08] bg-slate-950/60 px-3 py-2 text-xs text-slate-400">
@@ -1226,6 +1320,18 @@ function OfflineDebugPanel({
         <div>
           <dt className="font-bold text-slate-500">SW controlled</dt>
           <dd>{debugInfo.serviceWorkerControlled ? "yes" : "no"}</dd>
+        </div>
+        <div>
+          <dt className="font-bold text-slate-500">Cached thumbnails</dt>
+          <dd>{debugInfo.imageCacheStats.cachedCount}</dd>
+        </div>
+        <div>
+          <dt className="font-bold text-slate-500">Image cache bytes</dt>
+          <dd>{formatCurrency(debugInfo.imageCacheStats.totalBytes).replace("$", "")} bytes</dd>
+        </div>
+        <div>
+          <dt className="font-bold text-slate-500">Image cache failures</dt>
+          <dd>{debugInfo.imageCacheStats.failedCount}</dd>
         </div>
         <div>
           <dt className="font-bold text-slate-500">Schema version</dt>
@@ -1275,6 +1381,21 @@ function OfflineDebugPanel({
               </button>
             </dd>
             {debugMessage ? <dd className="mt-2 text-cyan-100">{debugMessage}</dd> : null}
+            {onClearCachedImages ? (
+              <dd className="mt-2">
+                <button
+                  type="button"
+                  className="btn-secondary rounded-md px-3 py-2 text-xs font-black"
+                  onClick={() => {
+                    if (window.confirm("Clear cached card thumbnail images only? Offline snapshot data and pending edits will be kept.")) {
+                      onClearCachedImages().catch(() => undefined);
+                    }
+                  }}
+                >
+                  Clear cached images
+                </button>
+              </dd>
+            ) : null}
             {pendingCountEvents.length > 0 ? (
               <dd className="mt-2 rounded-md border border-white/[0.08] bg-slate-950/80 p-2">
                 <p className="font-bold text-slate-500">Pending count events</p>

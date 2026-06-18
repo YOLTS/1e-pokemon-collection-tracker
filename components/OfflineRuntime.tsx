@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { fetchAndSaveOfflineSnapshot } from "@/lib/offline-storage";
+import { fetchAndSaveOfflineSnapshot, warmOwnedCardThumbnailCache } from "@/lib/offline-storage";
 
 let offlineShellWarmed = false;
 const serviceWorkerReloadFlag = "pokemonServiceWorkerControlReloaded";
@@ -130,6 +130,25 @@ export function OfflineRuntime() {
 
       try {
         const snapshot = await fetchAndSaveOfflineSnapshot();
+        warmOwnedCardThumbnailCache(snapshot)
+          .then((result) => {
+            try {
+              window.localStorage.setItem(
+                "pokemonOfflineImageCacheDebug",
+                JSON.stringify({
+                  checkedAt: new Date().toISOString(),
+                  attempted: result.attempted,
+                  failed: result.failed,
+                  failures: result.failures,
+                }),
+              );
+            } catch {
+              // Image cache diagnostics are best-effort only.
+            }
+          })
+          .catch((error) => {
+            console.warn("Offline thumbnail cache warmup failed.", error);
+          });
         try {
           window.localStorage.setItem(
             "pokemonOfflineSnapshotDebug",
