@@ -173,6 +173,10 @@ function isUnresolvedMutation(mutation: OfflineMutation) {
   return mutation.status === "PENDING" || mutation.status === "SYNCING" || mutation.status === "FAILED";
 }
 
+function isCurrentOfflineUiMutation(mutation: OfflineMutation) {
+  return mutation.clientMutationSource === "OFFLINE_UI";
+}
+
 function isSetOwnedMutationForVariant(mutation: OfflineMutation, variantId: number) {
   return (
     mutation.type === "SET_OWNED" &&
@@ -271,6 +275,7 @@ export async function enqueueMutation(newMutation: NewOfflineMutation) {
     localMutationId: newMutation.localMutationId ?? createLocalMutationId(),
     type: newMutation.type,
     payload: newMutation.payload,
+    clientMutationSource: "OFFLINE_UI",
     createdAt: now,
     updatedAt: now,
     baseSnapshotGeneratedAt: newMutation.baseSnapshotGeneratedAt ?? null,
@@ -324,6 +329,7 @@ export async function enqueueLatestSetOwnedMutation(
             newMutation.localMutationId ?? existingMutation?.localMutationId ?? createLocalMutationId(),
           type: "SET_OWNED",
           payload: newMutation.payload,
+          clientMutationSource: "OFFLINE_UI",
           createdAt: existingMutation?.createdAt ?? now,
           updatedAt: now,
           baseSnapshotGeneratedAt:
@@ -388,6 +394,7 @@ export async function enqueueLatestMarketPriceMutation(
             newMutation.localMutationId ?? existingMutation?.localMutationId ?? createLocalMutationId(),
           type: "UPDATE_MARKET_PRICE",
           payload: newMutation.payload,
+          clientMutationSource: "OFFLINE_UI",
           createdAt: existingMutation?.createdAt ?? now,
           updatedAt: now,
           baseSnapshotGeneratedAt:
@@ -428,6 +435,12 @@ export async function enqueueLatestMarketPriceMutation(
 }
 
 export async function listPendingMutations() {
+  const mutations = await listAllPendingMutationDebugRecords();
+
+  return mutations.filter(isCurrentOfflineUiMutation);
+}
+
+export async function listAllPendingMutationDebugRecords() {
   return withOfflineDatabase(async (database) => {
     const transaction = database.transaction(pendingMutationsStore, "readonly");
     const request = transaction.objectStore(pendingMutationsStore).getAll();

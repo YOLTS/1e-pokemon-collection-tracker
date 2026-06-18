@@ -71,6 +71,7 @@ export type OfflineMutation<TPayload extends OfflineMutationPayload = OfflineMut
   localMutationId: string;
   type: OfflineMutationType;
   payload: TPayload;
+  clientMutationSource?: "OFFLINE_UI";
   createdAt: string;
   updatedAt: string;
   baseSnapshotGeneratedAt: string | null;

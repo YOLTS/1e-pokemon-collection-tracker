@@ -6,6 +6,7 @@ import {
   clearPendingMutationDebugStores,
   enqueueLatestMarketPriceMutation,
   enqueueLatestSetOwnedMutation,
+  listAllPendingMutationDebugRecords,
   listOfflineMutationDebugEvents,
   listPendingMutations,
   loadOfflineSnapshot,
@@ -124,6 +125,7 @@ export function OfflineModeClient() {
   const [localMessage, setLocalMessage] = useState("");
   const [pendingMutationCount, setPendingMutationCount] = useState(0);
   const [debugPendingMutations, setDebugPendingMutations] = useState<OfflineMutation[]>([]);
+  const [debugRawPendingMutations, setDebugRawPendingMutations] = useState<OfflineMutation[]>([]);
   const [debugMessage, setDebugMessage] = useState("");
   const [debugPendingCountEvents, setDebugPendingCountEvents] = useState<string[]>([]);
   const [debugEnqueueEvents, setDebugEnqueueEvents] = useState<ReturnType<typeof listOfflineMutationDebugEvents>>([]);
@@ -172,12 +174,14 @@ export function OfflineModeClient() {
     async function refreshPendingMutationCountOnLoad() {
       try {
         const pendingMutations = await listPendingMutations();
+        const rawPendingMutations = await listAllPendingMutationDebugRecords();
         if (!cancelled) {
           setPendingMutationCount(pendingMutations.length);
           setDebugPendingMutations(pendingMutations);
+          setDebugRawPendingMutations(rawPendingMutations);
           setDebugPendingCountEvents((events) => [
             ...events,
-            `${new Date().toISOString()} initial load count=${pendingMutations.length}`,
+            `${new Date().toISOString()} initial load count=${pendingMutations.length} raw=${rawPendingMutations.length}`,
           ].slice(-10));
           setDebugEnqueueEvents(listOfflineMutationDebugEvents());
         }
@@ -223,11 +227,13 @@ export function OfflineModeClient() {
 
   async function refreshPendingMutationCount() {
     const pendingMutations = await listPendingMutations();
+    const rawPendingMutations = await listAllPendingMutationDebugRecords();
     setPendingMutationCount(pendingMutations.length);
     setDebugPendingMutations(pendingMutations);
+    setDebugRawPendingMutations(rawPendingMutations);
     setDebugPendingCountEvents((events) => [
       ...events,
-      `${new Date().toISOString()} refresh count=${pendingMutations.length}`,
+      `${new Date().toISOString()} refresh count=${pendingMutations.length} raw=${rawPendingMutations.length}`,
     ].slice(-10));
     setDebugEnqueueEvents(listOfflineMutationDebugEvents());
     return pendingMutations.length;
@@ -235,18 +241,21 @@ export function OfflineModeClient() {
 
   async function listPendingMutationsForDebug() {
     const pendingMutations = await listPendingMutations();
+    const rawPendingMutations = await listAllPendingMutationDebugRecords();
     setDebugPendingMutations(pendingMutations);
+    setDebugRawPendingMutations(rawPendingMutations);
     setDebugEnqueueEvents(listOfflineMutationDebugEvents());
     setDebugMessage(
-      pendingMutations.length === 0
+      pendingMutations.length === 0 && rawPendingMutations.length === 0
         ? "No pending local mutations."
-        : `${pendingMutations.length} pending local mutation${pendingMutations.length === 1 ? "" : "s"}.`,
+        : `${pendingMutations.length} active pending mutation${pendingMutations.length === 1 ? "" : "s"}; ${rawPendingMutations.length} raw pending row${rawPendingMutations.length === 1 ? "" : "s"}.`,
     );
   }
 
   async function clearPendingMutationsForDebug() {
     await clearPendingMutationDebugStores();
     setDebugPendingMutations([]);
+    setDebugRawPendingMutations([]);
     setDebugMessage("Pending local mutations cleared. Snapshot was not changed.");
     await refreshPendingMutationCount();
   }
@@ -384,6 +393,7 @@ export function OfflineModeClient() {
         <OfflineDebugPanel
           debugInfo={debugInfo}
           pendingMutations={debugPendingMutations}
+          rawPendingMutations={debugRawPendingMutations}
           pendingCountEvents={debugPendingCountEvents}
           enqueueEvents={debugEnqueueEvents}
           debugMessage={debugMessage}
@@ -406,6 +416,7 @@ export function OfflineModeClient() {
         <OfflineDebugPanel
           debugInfo={debugInfo}
           pendingMutations={debugPendingMutations}
+          rawPendingMutations={debugRawPendingMutations}
           pendingCountEvents={debugPendingCountEvents}
           enqueueEvents={debugEnqueueEvents}
           debugMessage={debugMessage}
@@ -427,6 +438,7 @@ export function OfflineModeClient() {
         <OfflineDebugPanel
           debugInfo={debugInfo}
           pendingMutations={debugPendingMutations}
+          rawPendingMutations={debugRawPendingMutations}
           pendingCountEvents={debugPendingCountEvents}
           enqueueEvents={debugEnqueueEvents}
           debugMessage={debugMessage}
@@ -493,6 +505,7 @@ export function OfflineModeClient() {
         <OfflineDebugPanel
           debugInfo={debugInfo}
           pendingMutations={debugPendingMutations}
+          rawPendingMutations={debugRawPendingMutations}
           pendingCountEvents={debugPendingCountEvents}
           enqueueEvents={debugEnqueueEvents}
           debugMessage={debugMessage}
@@ -834,6 +847,7 @@ function OfflineStat({ label, value }: { label: string; value: string }) {
 function OfflineDebugPanel({
   debugInfo,
   pendingMutations = [],
+  rawPendingMutations = [],
   pendingCountEvents = [],
   enqueueEvents = [],
   debugMessage = "",
@@ -842,6 +856,7 @@ function OfflineDebugPanel({
 }: {
   debugInfo: OfflineDebugInfo;
   pendingMutations?: OfflineMutation[];
+  rawPendingMutations?: OfflineMutation[];
   pendingCountEvents?: string[];
   enqueueEvents?: ReturnType<typeof listOfflineMutationDebugEvents>;
   debugMessage?: string;
@@ -926,13 +941,40 @@ function OfflineDebugPanel({
             ) : null}
             {pendingMutations.length > 0 ? (
               <dd className="mt-2 max-h-56 overflow-auto rounded-md border border-white/[0.08] bg-slate-950/80 p-2">
-                <p className="mb-2 font-bold text-slate-500">Pending mutations</p>
+                <p className="mb-2 font-bold text-slate-500">Active pending mutations</p>
                 <pre className="whitespace-pre-wrap break-all">
                   {JSON.stringify(
                     pendingMutations.map((mutation) => ({
                       localMutationId: mutation.localMutationId,
                       type: mutation.type,
                       status: mutation.status,
+                      clientMutationSource: mutation.clientMutationSource ?? null,
+                      variantId:
+                        typeof mutation.payload === "object" &&
+                        mutation.payload !== null &&
+                        "variantId" in mutation.payload
+                          ? mutation.payload.variantId
+                          : null,
+                      createdAt: mutation.createdAt,
+                      updatedAt: mutation.updatedAt,
+                      payload: mutation.payload,
+                    })),
+                    null,
+                    2,
+                  )}
+                </pre>
+              </dd>
+            ) : null}
+            {rawPendingMutations.length > 0 ? (
+              <dd className="mt-2 max-h-56 overflow-auto rounded-md border border-white/[0.08] bg-slate-950/80 p-2">
+                <p className="mb-2 font-bold text-slate-500">Raw pending store rows</p>
+                <pre className="whitespace-pre-wrap break-all">
+                  {JSON.stringify(
+                    rawPendingMutations.map((mutation) => ({
+                      localMutationId: mutation.localMutationId,
+                      type: mutation.type,
+                      status: mutation.status,
+                      clientMutationSource: mutation.clientMutationSource ?? null,
                       variantId:
                         typeof mutation.payload === "object" &&
                         mutation.payload !== null &&
