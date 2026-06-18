@@ -2,7 +2,6 @@ import Link from "next/link";
 import { unstable_noStore as noStore } from "next/cache";
 import { notFound } from "next/navigation";
 import { updateVariantDetails } from "@/app/actions";
-import { CardListBackLink } from "@/components/CardListBackLink";
 import { CardArtwork } from "@/components/CardArtwork";
 import { CARD_CONDITION } from "@/lib/domain";
 import { formatEnumLabel, getMarketPrice, getPrimaryCopy, hasOwnedCopy } from "@/lib/collection";
@@ -65,7 +64,14 @@ export default async function CardDetailPage({ params, searchParams }: CardDetai
   return (
     <div className="card-detail-page space-y-6">
       <nav className="flex flex-wrap items-center justify-between gap-3" aria-label="Card navigation">
-        <CardListBackLink />
+        <div className="flex flex-wrap items-center gap-3">
+          <Link href="/cards" className="btn-primary inline-flex items-center justify-center rounded-md px-4 py-2.5 text-sm font-black transition">
+            ← Back to Card List
+          </Link>
+          <span className="rounded-md border border-amber-300/30 bg-amber-300/10 px-3 py-2 text-xs font-black uppercase tracking-widest text-amber-100">
+            RESTORE_NAV_BUILD_VISIBLE
+          </span>
+        </div>
         <div className="flex flex-wrap items-center gap-3">
           <Link href={`/sets/${variant.card.set.slug}`} className="text-sm font-bold text-cyan-300 transition hover:text-white">
             Back to {variant.card.set.name}
