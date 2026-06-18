@@ -1,13 +1,13 @@
-const CACHE_NAME = "pokemon-tracker-shell-v10";
-const OFFLINE_URL = "/offline?v=10";
+const CACHE_NAME = "pokemon-tracker-shell-v11";
+const OFFLINE_URL = "/offline?v=11";
 const STATIC_ASSETS = [
   OFFLINE_URL,
-  "/manifest.webmanifest?v=10",
-  "/icons/icon-192.png?v=10",
-  "/icons/icon-512.png?v=10",
-  "/icons/icon-maskable-512.png?v=10",
-  "/icons/apple-touch-icon.png?v=10",
-  "/icons/favicon-32.png?v=10",
+  "/manifest.webmanifest?v=11",
+  "/icons/icon-192.png?v=11",
+  "/icons/icon-512.png?v=11",
+  "/icons/icon-maskable-512.png?v=11",
+  "/icons/apple-touch-icon.png?v=11",
+  "/icons/favicon-32.png?v=11",
   "/logos/top_banner_logo.png",
   "/backgrounds/neon_bg1.png",
 ];
