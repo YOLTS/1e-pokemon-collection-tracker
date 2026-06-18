@@ -2,7 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { CardArtwork } from "@/components/CardArtwork";
-import { loadOfflineSnapshot } from "@/lib/offline-storage";
+import {
+  enqueueLatestSetOwnedMutation,
+  listPendingMutations,
+  loadOfflineSnapshot,
+} from "@/lib/offline-storage";
+import { applyLocalMutationAndPersist } from "@/lib/offline-mutations";
 import {
   getOfflineMarketPrice,
   getOfflinePrimaryCopy,
@@ -113,12 +118,17 @@ export function OfflineModeClient() {
   const [status, setStatus] = useState<OfflineLoadStatus>("loading");
   const [online, setOnline] = useState(false);
   const [blockedMessage, setBlockedMessage] = useState("");
+  const [localMessage, setLocalMessage] = useState("");
+  const [pendingMutationCount, setPendingMutationCount] = useState(0);
+  const [editingVariantId, setEditingVariantId] = useState<number | null>(null);
   const [currentPath, setCurrentPath] = useState("/");
   const [loadError, setLoadError] = useState("");
   const [serviceWorkerDebug, setServiceWorkerDebug] = useState("");
   const [serviceWorkerControlled, setServiceWorkerControlled] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
+
     setCurrentPath(window.location.pathname);
     setView(initialView());
     setOnline(navigator.onLine);
@@ -151,6 +161,19 @@ export function OfflineModeClient() {
 
     navigator.serviceWorker?.addEventListener("controllerchange", handleControllerChange);
 
+    async function refreshPendingMutationCount() {
+      try {
+        const pendingMutations = await listPendingMutations();
+        if (!cancelled) {
+          setPendingMutationCount(pendingMutations.length);
+        }
+      } catch {
+        if (!cancelled) {
+          setPendingMutationCount(0);
+        }
+      }
+    }
+
     loadOfflineSnapshot()
       .then((loadedSnapshot) => {
         setSnapshot(loadedSnapshot);
@@ -160,8 +183,10 @@ export function OfflineModeClient() {
         setLoadError(error instanceof Error ? error.message : "Unknown IndexedDB error");
         setStatus("error");
       });
+    refreshPendingMutationCount();
 
     return () => {
+      cancelled = true;
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
       navigator.serviceWorker?.removeEventListener("controllerchange", handleControllerChange);
@@ -170,11 +195,53 @@ export function OfflineModeClient() {
 
   function navigate(nextView: OfflineView) {
     setBlockedMessage("");
+    setLocalMessage("");
     setView(nextView);
   }
 
   function blockEdit() {
     setBlockedMessage("Connect to edit. Viewing local collection data.");
+  }
+
+  async function refreshPendingMutationCount() {
+    const pendingMutations = await listPendingMutations();
+    setPendingMutationCount(pendingMutations.length);
+    return pendingMutations.length;
+  }
+
+  async function toggleOfflineOwned(variant: OfflineVariant, owned: boolean) {
+    if (!snapshot || editingVariantId !== null) {
+      return;
+    }
+
+    const primaryCopy = getOfflinePrimaryCopy(variant);
+    setBlockedMessage("");
+    setLocalMessage("");
+    setEditingVariantId(variant.id);
+
+    try {
+      const mutation = await enqueueLatestSetOwnedMutation({
+        type: "SET_OWNED",
+        baseSnapshotGeneratedAt: snapshot.generatedAt,
+        payload: {
+          variantId: variant.id,
+          setSlug: variant.card.set.slug,
+          owned,
+          primaryCollectionItemId: primaryCopy?.id ?? null,
+          oldStatus: primaryCopy?.status ?? null,
+          newStatus: owned ? "OWNED" : "MISSING",
+        },
+      });
+      const updatedSnapshot = await applyLocalMutationAndPersist(mutation);
+      setSnapshot(updatedSnapshot);
+      const pendingCount = await refreshPendingMutationCount();
+      setLocalMessage(pendingCount === 1 ? "Saved locally · pending sync" : `${pendingCount} changes pending sync`);
+    } catch (error) {
+      await refreshPendingMutationCount().catch(() => undefined);
+      setBlockedMessage(error instanceof Error ? error.message : "Local ownership edit could not be saved.");
+    } finally {
+      setEditingVariantId(null);
+    }
   }
 
   const filteredVariants = useMemo(() => {
@@ -285,7 +352,11 @@ export function OfflineModeClient() {
               Local data
             </span>
             <span className="font-semibold text-slate-300">Last synced {formatTimestamp(snapshot.generatedAt)}</span>
-            <span className="text-slate-500">Read-only until connection is available.</span>
+            {pendingMutationCount > 0 ? (
+              <span className="rounded-full border border-amber-300/25 bg-amber-300/10 px-3 py-1 font-black text-amber-100">
+                {pendingMutationCount === 1 ? "1 change pending sync" : `${pendingMutationCount} changes pending sync`}
+              </span>
+            ) : null}
           </div>
           <div className="flex flex-wrap gap-2">
             <button type="button" className="btn-secondary rounded-md px-3 py-2 text-xs font-black" onClick={() => navigate({ name: "dashboard" })}>
@@ -302,6 +373,11 @@ export function OfflineModeClient() {
         {blockedMessage ? (
           <p className="mt-4 rounded-md border border-amber-300/25 bg-amber-300/10 px-3 py-2 text-sm font-bold text-amber-100">
             {blockedMessage}
+          </p>
+        ) : null}
+        {localMessage ? (
+          <p className="mt-4 rounded-md border border-emerald-300/25 bg-emerald-300/10 px-3 py-2 text-sm font-bold text-emerald-100">
+            {localMessage}
           </p>
         ) : null}
         {routeFallbackMessage ? (
@@ -327,12 +403,18 @@ export function OfflineModeClient() {
           setQuery={setQuery}
           variants={filteredVariants}
           navigate={navigate}
-          blockEdit={blockEdit}
+          toggleOfflineOwned={toggleOfflineOwned}
+          editingVariantId={editingVariantId}
         />
       ) : null}
 
       {effectiveView.name === "card" && selectedCard ? (
-        <OfflineCardDetail variant={selectedCard} blockEdit={blockEdit} />
+        <OfflineCardDetail
+          variant={selectedCard}
+          blockEdit={blockEdit}
+          toggleOfflineOwned={toggleOfflineOwned}
+          editingVariantId={editingVariantId}
+        />
       ) : null}
     </div>
   );
@@ -415,21 +497,23 @@ function OfflineCards({
   setQuery,
   variants,
   navigate,
-  blockEdit,
+  toggleOfflineOwned,
+  editingVariantId,
 }: {
   title: string;
   query: string;
   setQuery: (query: string) => void;
   variants: OfflineVariant[];
   navigate: (view: OfflineView) => void;
-  blockEdit: () => void;
+  toggleOfflineOwned: (variant: OfflineVariant, owned: boolean) => void;
+  editingVariantId: number | null;
 }) {
   return (
     <section className="neon-panel overflow-hidden rounded-lg">
       <div className="border-b border-cyan-300/10 bg-slate-950/[0.62] p-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="neon-eyebrow text-xs font-black uppercase tracking-widest">Read-only cards</p>
+            <p className="neon-eyebrow text-xs font-black uppercase tracking-widest">Local cards</p>
             <h2 className="mt-1 text-xl font-black text-white">{title}</h2>
             <p className="mt-1 text-sm text-slate-400">Showing {variants.length} cached cards</p>
           </div>
@@ -493,8 +577,13 @@ function OfflineCards({
                 <button type="button" className="btn-primary flex-1 rounded-md px-3 py-2 text-xs font-black" onClick={() => navigate({ name: "card", id: variant.id })}>
                   View details
                 </button>
-                <button type="button" className="btn-secondary flex-1 rounded-md px-3 py-2 text-xs font-black" onClick={blockEdit}>
-                  Edit online
+                <button
+                  type="button"
+                  className={`${owned ? "btn-secondary" : "btn-primary"} flex-1 rounded-md px-3 py-2 text-xs font-black`}
+                  disabled={editingVariantId !== null}
+                  onClick={() => toggleOfflineOwned(variant, !owned)}
+                >
+                  {editingVariantId === variant.id ? "Saving..." : owned ? "Mark missing" : "Mark owned"}
                 </button>
               </div>
             </article>
@@ -505,7 +594,17 @@ function OfflineCards({
   );
 }
 
-function OfflineCardDetail({ variant, blockEdit }: { variant: OfflineVariant; blockEdit: () => void }) {
+function OfflineCardDetail({
+  variant,
+  blockEdit,
+  toggleOfflineOwned,
+  editingVariantId,
+}: {
+  variant: OfflineVariant;
+  blockEdit: () => void;
+  toggleOfflineOwned: (variant: OfflineVariant, owned: boolean) => void;
+  editingVariantId: number | null;
+}) {
   const owned = hasOfflineOwnedCopy(variant);
   const primaryCopy = getOfflinePrimaryCopy(variant);
   const notes = primaryCopy?.notes || variant.notes;
@@ -547,9 +646,19 @@ function OfflineCardDetail({ variant, blockEdit }: { variant: OfflineVariant; bl
             {notes || (owned ? "No collector notes have been recorded for this copy." : "This card has not yet been added to the collection.")}
           </p>
         </div>
-        <button type="button" className="btn-secondary mt-6 rounded-md px-4 py-3 text-sm font-black" onClick={blockEdit}>
-          Edits require connection
-        </button>
+        <div className="mt-6 flex flex-wrap gap-3">
+          <button
+            type="button"
+            className={`${owned ? "btn-secondary" : "btn-primary"} rounded-md px-4 py-3 text-sm font-black`}
+            disabled={editingVariantId !== null}
+            onClick={() => toggleOfflineOwned(variant, !owned)}
+          >
+            {editingVariantId === variant.id ? "Saving..." : owned ? "Mark missing" : "Mark owned"}
+          </button>
+          <button type="button" className="btn-secondary rounded-md px-4 py-3 text-sm font-black" onClick={blockEdit}>
+            Price/details require connection
+          </button>
+        </div>
       </div>
     </section>
   );
