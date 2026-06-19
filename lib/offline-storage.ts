@@ -208,6 +208,27 @@ export async function getCachedCardThumbnailObjectUrl(cardId: number) {
   return blob ? URL.createObjectURL(blob) : null;
 }
 
+export async function getCachedCardThumbnailObjectUrlMap(cardIds: number[]) {
+  const uniqueCardIds = new Set(cardIds);
+  if (uniqueCardIds.size === 0) {
+    return {};
+  }
+
+  return withOfflineDatabase(async (database) => {
+    const transaction = database.transaction(cardImageBlobsStore, "readonly");
+    const request = transaction.objectStore(cardImageBlobsStore).getAll();
+    const records = (await requestResult(request)).filter(isCardImageBlobRecord);
+
+    return records.reduce<Record<number, string>>((objectUrls, record) => {
+      if (uniqueCardIds.has(record.cardId) && record.status === "CACHED" && record.blob) {
+        objectUrls[record.cardId] = URL.createObjectURL(record.blob);
+      }
+
+      return objectUrls;
+    }, {});
+  });
+}
+
 export async function cacheCardThumbnail(cardId: number, imageUrlSmall?: string | null) {
   if (!imageUrlSmall) {
     return null;

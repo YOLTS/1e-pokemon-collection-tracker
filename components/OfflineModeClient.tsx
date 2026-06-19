@@ -8,6 +8,7 @@ import {
   enqueueLatestMarketPriceMutation,
   enqueueLatestSetOwnedMutation,
   getCachedCardThumbnailObjectUrl,
+  getCachedCardThumbnailObjectUrlMap,
   listAllPendingMutationDebugRecords,
   listCachedImageStats,
   listOfflineMutationDebugEvents,
@@ -560,9 +561,6 @@ export function OfflineModeClient() {
             <span className={`rounded-full border px-3 py-1 font-black ${online ? "border-emerald-300/25 bg-emerald-300/10 text-emerald-100" : "border-cyan-300/25 bg-cyan-300/10 text-cyan-100"}`}>
               Local data
             </span>
-            <span className="rounded-md border border-fuchsia-300/50 bg-fuchsia-400/20 px-3 py-1 text-sm font-black text-fuchsia-50 shadow-glow">
-              OFFLINE_PARITY_BUILD_VISIBLE
-            </span>
             <span className="font-semibold text-slate-300">Last synced {formatTimestamp(snapshot.generatedAt)}</span>
             {pendingMutationCount > 0 ? (
               <span className="rounded-full border border-amber-300/25 bg-amber-300/10 px-3 py-1 font-black text-amber-100">
@@ -927,39 +925,40 @@ function OfflineCards({
 
   useEffect(() => {
     let cancelled = false;
-    let activeObjectUrls: string[] = [];
 
     async function loadCachedThumbnails() {
-      const entries = await Promise.all(
-        displayedVariants.map(async (variant) => {
-          const objectUrl = await getCachedCardThumbnailObjectUrl(variant.card.id).catch(() => null);
-          return [variant.card.id, objectUrl] as const;
-        }),
+      const objectUrlMap = await getCachedCardThumbnailObjectUrlMap(
+        displayedVariants.map((variant) => variant.card.id),
       );
-      const nextObjectUrls = entries
-        .map(([, objectUrl]) => objectUrl)
-        .filter((objectUrl): objectUrl is string => Boolean(objectUrl));
 
       if (cancelled) {
-        nextObjectUrls.forEach((objectUrl) => URL.revokeObjectURL(objectUrl));
+        Object.values(objectUrlMap).forEach((objectUrl) => URL.revokeObjectURL(objectUrl));
         return;
       }
 
-      activeObjectUrls = nextObjectUrls;
-      setCachedThumbnailUrls(
-        Object.fromEntries(
-          entries.filter((entry): entry is readonly [number, string] => Boolean(entry[1])),
-        ),
-      );
+      setCachedThumbnailUrls((previousObjectUrlMap) => {
+        Object.values(previousObjectUrlMap).forEach((objectUrl) => URL.revokeObjectURL(objectUrl));
+        return objectUrlMap;
+      });
     }
 
-    loadCachedThumbnails().catch(() => undefined);
+    loadCachedThumbnails().catch(() => {
+      setCachedThumbnailUrls((previousObjectUrlMap) => {
+        Object.values(previousObjectUrlMap).forEach((objectUrl) => URL.revokeObjectURL(objectUrl));
+        return {};
+      });
+    });
 
     return () => {
       cancelled = true;
-      activeObjectUrls.forEach((objectUrl) => URL.revokeObjectURL(objectUrl));
     };
   }, [displayedVariants]);
+
+  useEffect(() => {
+    return () => {
+      Object.values(cachedThumbnailUrls).forEach((objectUrl) => URL.revokeObjectURL(objectUrl));
+    };
+  }, [cachedThumbnailUrls]);
 
   return (
     <section className="neon-panel overflow-hidden rounded-lg">
@@ -1058,6 +1057,7 @@ function OfflineCards({
 
               <div className="mt-4 grid grid-cols-[7.25rem_1fr] gap-4">
                 <CardArtwork
+                  key={cachedThumbnailUrls[variant.card.id] ?? `offline-card-artwork-${variant.card.id}`}
                   name={variant.card.name}
                   cardNumber={variant.card.cardNumber}
                   setName={variant.card.set.name}
@@ -1197,6 +1197,7 @@ function OfflineCardDetail({
       <section className="card-detail-showcase neon-panel overflow-hidden rounded-lg">
         <div className="card-detail-artwork-stage">
           <CardArtwork
+            key={cachedThumbnailUrl ?? `offline-card-detail-artwork-${variant.card.id}`}
             name={variant.card.name}
             cardNumber={variant.card.cardNumber}
             setName={variant.card.set.name}
