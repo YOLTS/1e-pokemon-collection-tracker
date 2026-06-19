@@ -39,6 +39,15 @@ export type CachedImageStats = {
   totalBytes: number;
 };
 
+export type ThumbnailCacheProgress = {
+  totalEligible: number;
+  processed: number;
+  cached: number;
+  failed: number;
+  inProgress: boolean;
+  complete: boolean;
+};
+
 type OfflineMutationDebugEvent = {
   at: string;
   event: string;
@@ -339,29 +348,86 @@ export async function warmOwnedCardThumbnailCache(snapshot: OfflineSnapshot) {
     }, new Map<number, string>()),
   );
 
+  return cacheThumbnailTargets(ownedThumbnailTargets);
+}
+
+async function cacheThumbnailTargets(
+  thumbnailTargets: Array<[number, string]>,
+  onProgress?: (progress: ThumbnailCacheProgress) => void,
+) {
   const batchSize = 4;
   const failures: string[] = [];
+  let processed = 0;
+  let cached = 0;
 
-  for (let index = 0; index < ownedThumbnailTargets.length; index += batchSize) {
-    const batch = ownedThumbnailTargets.slice(index, index + batchSize);
+  onProgress?.({
+    totalEligible: thumbnailTargets.length,
+    processed,
+    cached,
+    failed: failures.length,
+    inProgress: true,
+    complete: false,
+  });
+
+  for (let index = 0; index < thumbnailTargets.length; index += batchSize) {
+    const batch = thumbnailTargets.slice(index, index + batchSize);
     const results = await Promise.allSettled(
       batch.map(([cardId, imageUrlSmall]) => cacheCardThumbnail(cardId, imageUrlSmall)),
     );
 
     results.forEach((result) => {
+      processed += 1;
       if (result.status === "rejected") {
         failures.push(result.reason instanceof Error ? result.reason.message : "Image cache request failed.");
+      } else if (result.value?.status === "CACHED") {
+        cached += 1;
       }
+    });
+
+    onProgress?.({
+      totalEligible: thumbnailTargets.length,
+      processed,
+      cached,
+      failed: failures.length,
+      inProgress: true,
+      complete: false,
     });
 
     await new Promise((resolve) => window.setTimeout(resolve, 75));
   }
 
+  onProgress?.({
+    totalEligible: thumbnailTargets.length,
+    processed,
+    cached,
+    failed: failures.length,
+    inProgress: false,
+    complete: true,
+  });
+
   return {
-    attempted: ownedThumbnailTargets.length,
+    attempted: thumbnailTargets.length,
+    cached,
     failed: failures.length,
     failures: failures.slice(0, 5),
   };
+}
+
+export async function cacheAllCardThumbnails(
+  snapshot: OfflineSnapshot,
+  onProgress?: (progress: ThumbnailCacheProgress) => void,
+) {
+  const allThumbnailTargets = Array.from(
+    snapshot.variants.reduce((targets, variant) => {
+      if (variant.card.imageUrlSmall && !targets.has(variant.card.id)) {
+        targets.set(variant.card.id, variant.card.imageUrlSmall);
+      }
+
+      return targets;
+    }, new Map<number, string>()),
+  );
+
+  return cacheThumbnailTargets(allThumbnailTargets, onProgress);
 }
 
 function isOfflineMutation(value: unknown): value is OfflineMutation {

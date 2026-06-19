@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { CardArtwork } from "@/components/CardArtwork";
 import {
+  cacheAllCardThumbnails,
   clearCachedImagesDebug,
   clearPendingMutationDebugStores,
   enqueueLatestMarketPriceMutation,
@@ -15,6 +16,7 @@ import {
   listPendingMutations,
   loadOfflineSnapshot,
   type CachedImageStats,
+  type ThumbnailCacheProgress,
 } from "@/lib/offline-storage";
 import { syncPendingOfflineMutations } from "@/lib/offline-sync";
 import { applyLocalMutationAndPersist, type OfflineMutation } from "@/lib/offline-mutations";
@@ -170,6 +172,8 @@ export function OfflineModeClient() {
     failedCount: 0,
     totalBytes: 0,
   });
+  const [thumbnailCacheProgress, setThumbnailCacheProgress] = useState<ThumbnailCacheProgress | null>(null);
+  const [isCachingAllThumbnails, setIsCachingAllThumbnails] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -309,8 +313,33 @@ export function OfflineModeClient() {
 
   async function clearCachedImagesForDebug() {
     await clearCachedImagesDebug();
+    setThumbnailCacheProgress(null);
     setDebugMessage("Cached card thumbnail images cleared. Snapshot and pending edits were not changed.");
     await refreshImageCacheStats();
+  }
+
+  async function cacheAllThumbnailsForDebug() {
+    if (!snapshot || isCachingAllThumbnails) {
+      return;
+    }
+
+    setIsCachingAllThumbnails(true);
+    setDebugMessage("Caching all thumbnails for offline use...");
+
+    try {
+      const result = await cacheAllCardThumbnails(snapshot, (progress) => {
+        setThumbnailCacheProgress(progress);
+      });
+      await refreshImageCacheStats();
+      setDebugMessage(
+        `Thumbnail cache complete. ${result.cached} cached, ${result.failed} failed, ${result.attempted} eligible.`,
+      );
+    } catch (error) {
+      await refreshImageCacheStats().catch(() => undefined);
+      setDebugMessage(error instanceof Error ? error.message : "Thumbnail cache failed.");
+    } finally {
+      setIsCachingAllThumbnails(false);
+    }
   }
 
   async function toggleOfflineOwned(variant: OfflineVariant, owned: boolean) {
@@ -490,6 +519,9 @@ export function OfflineModeClient() {
           onListPendingMutations={listPendingMutationsForDebug}
           onClearPendingMutations={clearPendingMutationsForDebug}
           onClearCachedImages={clearCachedImagesForDebug}
+          onCacheAllThumbnails={cacheAllThumbnailsForDebug}
+          thumbnailCacheProgress={thumbnailCacheProgress}
+          isCachingAllThumbnails={isCachingAllThumbnails}
         />
       </section>
     );
@@ -514,6 +546,9 @@ export function OfflineModeClient() {
           onListPendingMutations={listPendingMutationsForDebug}
           onClearPendingMutations={clearPendingMutationsForDebug}
           onClearCachedImages={clearCachedImagesForDebug}
+          onCacheAllThumbnails={cacheAllThumbnailsForDebug}
+          thumbnailCacheProgress={thumbnailCacheProgress}
+          isCachingAllThumbnails={isCachingAllThumbnails}
         />
       </section>
     );
@@ -537,6 +572,9 @@ export function OfflineModeClient() {
           onListPendingMutations={listPendingMutationsForDebug}
           onClearPendingMutations={clearPendingMutationsForDebug}
           onClearCachedImages={clearCachedImagesForDebug}
+          onCacheAllThumbnails={cacheAllThumbnailsForDebug}
+          thumbnailCacheProgress={thumbnailCacheProgress}
+          isCachingAllThumbnails={isCachingAllThumbnails}
         />
       </section>
     );
@@ -626,6 +664,9 @@ export function OfflineModeClient() {
           onListPendingMutations={listPendingMutationsForDebug}
           onClearPendingMutations={clearPendingMutationsForDebug}
           onClearCachedImages={clearCachedImagesForDebug}
+          onCacheAllThumbnails={cacheAllThumbnailsForDebug}
+          thumbnailCacheProgress={thumbnailCacheProgress}
+          isCachingAllThumbnails={isCachingAllThumbnails}
         />
       </section>
 
@@ -1293,6 +1334,9 @@ function OfflineDebugPanel({
   onListPendingMutations,
   onClearPendingMutations,
   onClearCachedImages,
+  onCacheAllThumbnails,
+  thumbnailCacheProgress,
+  isCachingAllThumbnails = false,
 }: {
   debugInfo: OfflineDebugInfo;
   pendingMutations?: OfflineMutation[];
@@ -1303,6 +1347,9 @@ function OfflineDebugPanel({
   onListPendingMutations?: () => Promise<void>;
   onClearPendingMutations?: () => Promise<void>;
   onClearCachedImages?: () => Promise<void>;
+  onCacheAllThumbnails?: () => Promise<void>;
+  thumbnailCacheProgress?: ThumbnailCacheProgress | null;
+  isCachingAllThumbnails?: boolean;
 }) {
   return (
     <details className="mt-4 rounded-md border border-white/[0.08] bg-slate-950/60 px-3 py-2 text-xs text-slate-400">
@@ -1383,7 +1430,19 @@ function OfflineDebugPanel({
             </dd>
             {debugMessage ? <dd className="mt-2 text-cyan-100">{debugMessage}</dd> : null}
             {onClearCachedImages ? (
-              <dd className="mt-2">
+              <dd className="mt-2 flex flex-wrap gap-2">
+                {onCacheAllThumbnails ? (
+                  <button
+                    type="button"
+                    className="btn-primary rounded-md px-3 py-2 text-xs font-black"
+                    disabled={isCachingAllThumbnails}
+                    onClick={() => {
+                      onCacheAllThumbnails().catch(() => undefined);
+                    }}
+                  >
+                    {isCachingAllThumbnails ? "Caching thumbnails..." : "Cache all thumbnails for offline"}
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   className="btn-secondary rounded-md px-3 py-2 text-xs font-black"
@@ -1395,6 +1454,20 @@ function OfflineDebugPanel({
                 >
                   Clear cached images
                 </button>
+              </dd>
+            ) : null}
+            {thumbnailCacheProgress ? (
+              <dd className="mt-2 rounded-md border border-cyan-300/10 bg-slate-950/80 p-2">
+                <p className="font-bold text-slate-500">Thumbnail cache progress</p>
+                <p className="mt-1">
+                  {thumbnailCacheProgress.complete
+                    ? "Complete"
+                    : thumbnailCacheProgress.inProgress
+                      ? "In progress"
+                      : "Idle"}{" "}
+                  - {thumbnailCacheProgress.processed}/{thumbnailCacheProgress.totalEligible} processed,{" "}
+                  {thumbnailCacheProgress.cached} cached, {thumbnailCacheProgress.failed} failed
+                </p>
               </dd>
             ) : null}
             {pendingCountEvents.length > 0 ? (
