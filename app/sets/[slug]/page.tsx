@@ -18,8 +18,10 @@ type SetDetailPageProps = {
 };
 
 export default async function SetDetailPage({ params }: SetDetailPageProps) {
+  const pageStartedAt = Date.now();
   noStore();
 
+  const dataFetchStartedAt = Date.now();
   const set = await prisma.pokemonSet.findUnique({
     where: { slug: params.slug },
     include: {
@@ -40,6 +42,7 @@ export default async function SetDetailPage({ params }: SetDetailPageProps) {
       },
     },
   });
+  const dataFetchMs = Date.now() - dataFetchStartedAt;
 
   if (!set) {
     notFound();
@@ -58,6 +61,14 @@ export default async function SetDetailPage({ params }: SetDetailPageProps) {
       return map;
     }, new Map<string, { total: number; owned: number }>()),
   ).sort(([a], [b]) => compareRarity(a, b));
+  const serverPrepareMs = Date.now() - pageStartedAt;
+  const navigationDebugTiming = {
+    route: `/sets/${params.slug}`,
+    dataFetchMs,
+    serverPrepareMs,
+    variantCount: variants.length,
+    selectedSet: set.slug,
+  };
 
   return (
     <div className="space-y-6">
@@ -139,7 +150,7 @@ export default async function SetDetailPage({ params }: SetDetailPageProps) {
         </div>
       </section>
 
-      <VariantTable variants={variants} />
+      <VariantTable variants={variants} navigationDebugTiming={navigationDebugTiming} />
     </div>
   );
 }

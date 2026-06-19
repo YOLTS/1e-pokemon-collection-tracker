@@ -1,12 +1,22 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { CardArtwork } from "@/components/CardArtwork";
 import { isManualMarketPriceSource } from "@/lib/domain";
 import { formatCurrency, formatMarketPrice } from "@/lib/format";
+import {
+  backNavigationTransitionKey,
+  detailNavigationTransitionKey,
+  enableNavigationDebugFromUrl,
+  getNavigationTransitionElapsedMs,
+  getNavigationType,
+  recordNavigationDebug,
+  writeNavigationTransition,
+} from "@/lib/navigation-debug";
 import { compareRarity, rarityToken } from "@/lib/rarity";
-import type { PricingDebugSummary } from "@/components/VariantTable";
+import type { NavigationDebugServerTiming, PricingDebugSummary } from "@/components/VariantTable";
 
 type OwnedItemRow = {
   id: number;
@@ -55,6 +65,7 @@ type VariantTableClientProps = {
   variants: VariantRow[];
   showSet?: boolean;
   pricingDebug?: PricingDebugSummary;
+  navigationDebugTiming?: NavigationDebugServerTiming;
   toggleOwnedAction: (formData: FormData) => void | Promise<void>;
 };
 
@@ -74,6 +85,7 @@ type CardListNavigationState = {
 };
 
 const cardListNavigationStateKey = "pokemonCardListNavigationState";
+const useBrowserLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 function cardNumberValue(cardNumber: string) {
   const [number] = cardNumber.split("/");
@@ -151,8 +163,10 @@ export function VariantTableClient({
   variants,
   showSet = false,
   pricingDebug,
+  navigationDebugTiming,
   toggleOwnedAction,
 }: VariantTableClientProps) {
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const [ownedFilter, setOwnedFilter] = useState<OwnedFilter>("all");
   const [rarityFilter, setRarityFilter] = useState("all");
@@ -227,6 +241,19 @@ export function VariantTableClient({
   const visibleOwned = filteredVariants.filter(hasOwnedCopy).length;
 
   useEffect(() => {
+    enableNavigationDebugFromUrl();
+
+    recordNavigationDebug("list:mounted", {
+      showSet,
+      variantCount: variants.length,
+      filteredVariantCount: filteredVariants.length,
+      serverTiming: navigationDebugTiming ?? null,
+      backTransitionMs: getNavigationTransitionElapsedMs(backNavigationTransitionKey),
+      navigationType: getNavigationType(),
+    });
+  }, [filteredVariants.length, navigationDebugTiming, showSet, variants.length]);
+
+  useBrowserLayoutEffect(() => {
     if (
       restoredNavigationState ||
       typeof window === "undefined" ||
@@ -238,8 +265,24 @@ export function VariantTableClient({
     const savedState = readCardListNavigationState();
     setRestoredNavigationState(true);
     if (!savedState || savedState.path !== `${window.location.pathname}${window.location.search}`) {
+      recordNavigationDebug("list:restore-state-skipped", {
+        reason: savedState ? "saved-path-mismatch" : "no-saved-state",
+        savedPath: savedState?.path ?? null,
+        currentPath: `${window.location.pathname}${window.location.search}`,
+      });
       return;
     }
+
+    recordNavigationDebug("list:restore-state-start", {
+      sourceType: savedState.sourceType ?? null,
+      selectedVariantId: savedState.selectedVariantId,
+      savedScrollY: savedState.scrollY,
+      queryLength: savedState.query.length,
+      ownedFilter: savedState.ownedFilter,
+      rarityFilter: savedState.rarityFilter,
+      sortKey: savedState.sortKey,
+      backTransitionMs: getNavigationTransitionElapsedMs(backNavigationTransitionKey),
+    });
 
     setQuery(savedState.query);
     setOwnedFilter(savedState.ownedFilter);
@@ -248,26 +291,73 @@ export function VariantTableClient({
     setRestoreTarget({ variantId: savedState.selectedVariantId, scrollY: savedState.scrollY });
   }, [restoredNavigationState]);
 
-  useEffect(() => {
+  useBrowserLayoutEffect(() => {
     if (!restoreTarget || !filteredVariants.some((variant) => variant.id === restoreTarget.variantId)) {
       return;
     }
 
-    const timeout = window.setTimeout(() => {
+    const restoreStartedAt = performance.now();
+    let animationFrame = 0;
+    let timeout = 0;
+    let reportedRestore = false;
+
+    const restoreScroll = () => {
       window.scrollTo({ top: restoreTarget.scrollY, behavior: "auto" });
 
-      window.requestAnimationFrame(() => {
+      animationFrame = window.requestAnimationFrame(() => {
         const selectedCard = document.getElementById(`variant-card-${restoreTarget.variantId}`);
         const bounds = selectedCard?.getBoundingClientRect();
+        const usedAnchorFallback = !selectedCard || !bounds || bounds.top < 80 || bounds.bottom > window.innerHeight;
         if (!selectedCard || !bounds || bounds.top < 80 || bounds.bottom > window.innerHeight) {
           selectedCard?.scrollIntoView({ block: "center", behavior: "auto" });
         }
+        if (!reportedRestore) {
+          reportedRestore = true;
+          recordNavigationDebug("list:scroll-restore-complete", {
+            selectedVariantId: restoreTarget.variantId,
+            targetScrollY: restoreTarget.scrollY,
+            actualScrollY: Math.round(window.scrollY),
+            durationMs: Math.round(performance.now() - restoreStartedAt),
+            usedAnchorFallback,
+            selectedCardFound: Boolean(selectedCard),
+            backTransitionMs: getNavigationTransitionElapsedMs(backNavigationTransitionKey),
+          });
+          recordNavigationDebug("back:list-usable", {
+            selectedVariantId: restoreTarget.variantId,
+            elapsedMs: getNavigationTransitionElapsedMs(backNavigationTransitionKey),
+            visibleCards: filteredVariants.length,
+          });
+        }
         setRestoreTarget(null);
       });
-    }, 50);
+    };
 
-    return () => window.clearTimeout(timeout);
+    recordNavigationDebug("list:scroll-restore-start", {
+      selectedVariantId: restoreTarget.variantId,
+      targetScrollY: restoreTarget.scrollY,
+      visibleCards: filteredVariants.length,
+    });
+    restoreScroll();
+    timeout = window.setTimeout(restoreScroll, 80);
+
+    return () => {
+      window.cancelAnimationFrame(animationFrame);
+      window.clearTimeout(timeout);
+    };
   }, [filteredVariants, restoreTarget]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !("scrollRestoration" in window.history)) {
+      return;
+    }
+
+    const previousScrollRestoration = window.history.scrollRestoration;
+    window.history.scrollRestoration = "manual";
+
+    return () => {
+      window.history.scrollRestoration = previousScrollRestoration;
+    };
+  }, []);
 
   function saveCardListNavigationState(variant: VariantRow) {
     if (
@@ -296,6 +386,29 @@ export function VariantTableClient({
     } catch {
       // Returning to the card list still works without restored state.
     }
+
+    writeNavigationTransition(detailNavigationTransitionKey, {
+      sourceType,
+      sourcePath: state.path,
+      targetPath: `/cards/${variant.id}`,
+      variantId: variant.id,
+      scrollY: state.scrollY,
+      queryLength: query.length,
+      ownedFilter,
+      rarityFilter,
+      sortKey,
+    });
+    recordNavigationDebug("card-detail:navigate-start", {
+      sourceType,
+      sourcePath: state.path,
+      targetPath: `/cards/${variant.id}`,
+      variantId: variant.id,
+      scrollY: state.scrollY,
+      queryLength: query.length,
+      ownedFilter,
+      rarityFilter,
+      sortKey,
+    });
   }
 
   return (
@@ -469,6 +582,9 @@ export function VariantTableClient({
                 <Link
                   href={`/cards/${variant.id}`}
                   className={`${owned ? "btn-primary" : "btn-secondary"} flex-1 whitespace-nowrap rounded-md px-3 py-2 text-center text-xs font-black transition`}
+                  prefetch
+                  onPointerEnter={() => router.prefetch(`/cards/${variant.id}`)}
+                  onFocus={() => router.prefetch(`/cards/${variant.id}`)}
                   onClick={() => saveCardListNavigationState(variant)}
                 >
                   View details

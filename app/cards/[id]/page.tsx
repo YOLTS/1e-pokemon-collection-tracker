@@ -4,6 +4,7 @@ import { updateVariantDetails } from "@/app/actions";
 import { AllCardsResetLink, SetResetLink } from "@/components/AllCardsResetLink";
 import { CardArtwork } from "@/components/CardArtwork";
 import { CardListBackLink } from "@/components/CardListBackLink";
+import { NavigationTimingLogger } from "@/components/NavigationTimingLogger";
 import { CARD_CONDITION } from "@/lib/domain";
 import { formatEnumLabel, getMarketPrice, getPrimaryCopy, hasOwnedCopy } from "@/lib/collection";
 import { formatCurrency, formatMarketPrice } from "@/lib/format";
@@ -24,6 +25,7 @@ type CardDetailPageProps = {
 const conditionOptions = Object.values(CARD_CONDITION);
 
 export default async function CardDetailPage({ params, searchParams }: CardDetailPageProps) {
+  const pageStartedAt = Date.now();
   noStore();
 
   const variantId = Number(params.id);
@@ -31,6 +33,7 @@ export default async function CardDetailPage({ params, searchParams }: CardDetai
     notFound();
   }
 
+  const dataFetchStartedAt = Date.now();
   const variant = await prisma.cardVariant.findUnique({
     where: { id: variantId },
     include: {
@@ -50,6 +53,7 @@ export default async function CardDetailPage({ params, searchParams }: CardDetai
       },
     },
   });
+  const dataFetchMs = Date.now() - dataFetchStartedAt;
 
   if (!variant) {
     notFound();
@@ -61,9 +65,23 @@ export default async function CardDetailPage({ params, searchParams }: CardDetai
   const gradingLabel = primaryCopy
     ? `${formatEnumLabel(primaryCopy.gradingCompany)}${primaryCopy.grade ? ` ${primaryCopy.grade}` : ""}`
     : "Not graded";
+  const serverPrepareMs = Date.now() - pageStartedAt;
 
   return (
     <div className="card-detail-page space-y-6">
+      <NavigationTimingLogger
+        event="card-detail"
+        route={`/cards/${variant.id}`}
+        serverTiming={{
+          route: `/cards/${variant.id}`,
+          dataFetchMs,
+          serverPrepareMs,
+          variantId: variant.id,
+          setSlug: variant.card.set.slug,
+          imageUrlSmallPresent: Boolean(variant.card.imageUrlSmall),
+          imageUrlLargePresent: Boolean(variant.card.imageUrlLarge),
+        }}
+      />
       <nav className="flex flex-wrap items-center justify-between gap-3" aria-label="Card navigation">
         <div className="flex flex-wrap items-center gap-3">
           <CardListBackLink />

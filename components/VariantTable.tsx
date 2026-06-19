@@ -20,18 +20,28 @@ export type PricingDebugSummary = {
   highestPricedValue: number | null;
 };
 
+export type NavigationDebugServerTiming = {
+  route: string;
+  dataFetchMs: number;
+  serverPrepareMs: number;
+  variantCount: number;
+  selectedSet?: string | null;
+};
+
 type VariantTableProps = {
   variants: VariantRow[];
   showSet?: boolean;
   pricingDebug?: PricingDebugSummary;
+  navigationDebugTiming?: NavigationDebugServerTiming;
 };
 
-export function VariantTable({ variants, showSet = false, pricingDebug }: VariantTableProps) {
+export function VariantTable({ variants, showSet = false, pricingDebug, navigationDebugTiming }: VariantTableProps) {
   return (
     <VariantTableClient
       variants={variants}
       showSet={showSet}
       pricingDebug={pricingDebug}
+      navigationDebugTiming={navigationDebugTiming}
       toggleOwnedAction={toggleVariantOwned}
     />
   );

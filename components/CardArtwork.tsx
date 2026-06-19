@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { recordNavigationDebug } from "@/lib/navigation-debug";
 
 type CardArtworkProps = {
   name: string;
@@ -44,6 +45,7 @@ export function CardArtwork({
   const [previewUrl, setPreviewUrl] = useState(imageUrlLarge || imageUrlSmall || "");
   const [previewError, setPreviewError] = useState(false);
   const thumbnailRef = useRef<HTMLImageElement>(null);
+  const imageStartedAtRef = useRef<number | null>(null);
 
   const closePreview = useCallback(() => {
     setIsPreviewOpen(false);
@@ -53,12 +55,22 @@ export function CardArtwork({
 
   useEffect(() => {
     setState(imageUrl ? "loading" : "error");
+    imageStartedAtRef.current = imageUrl && typeof performance !== "undefined" ? performance.now() : null;
 
     const thumbnail = thumbnailRef.current;
     if (imageUrl && thumbnail?.complete) {
       setState(thumbnail.naturalWidth > 0 ? "loaded" : "error");
+      if (priority || preferLarge) {
+        recordNavigationDebug("artwork:thumbnail-complete-on-mount", {
+          name,
+          cardNumber,
+          preferLarge,
+          priority,
+          naturalWidth: thumbnail.naturalWidth,
+        });
+      }
     }
-  }, [imageUrl]);
+  }, [cardNumber, imageUrl, name, preferLarge, priority]);
 
   useEffect(() => {
     setPreviewUrl(imageUrlLarge || imageUrlSmall || "");
@@ -127,8 +139,36 @@ export function CardArtwork({
             state === "loaded" ? "opacity-100" : "opacity-0"
           }`}
           loading={priority ? "eager" : "lazy"}
-          onLoad={() => setState("loaded")}
-          onError={() => setState("error")}
+          onLoad={() => {
+            setState("loaded");
+            if (priority || preferLarge) {
+              recordNavigationDebug("artwork:thumbnail-loaded", {
+                name,
+                cardNumber,
+                preferLarge,
+                priority,
+                elapsedMs:
+                  imageStartedAtRef.current === null || typeof performance === "undefined"
+                    ? null
+                    : Math.round(performance.now() - imageStartedAtRef.current),
+              });
+            }
+          }}
+          onError={() => {
+            setState("error");
+            if (priority || preferLarge) {
+              recordNavigationDebug("artwork:thumbnail-error", {
+                name,
+                cardNumber,
+                preferLarge,
+                priority,
+                elapsedMs:
+                  imageStartedAtRef.current === null || typeof performance === "undefined"
+                    ? null
+                    : Math.round(performance.now() - imageStartedAtRef.current),
+              });
+            }
+          }}
         />
       ) : null}
 

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { recordNavigationDebug } from "@/lib/navigation-debug";
 
 const cardListNavigationStateKey = "pokemonCardListNavigationState";
 
@@ -18,7 +19,10 @@ export function AllCardsResetLink() {
     <Link
       href="/cards"
       className="btn-secondary inline-flex items-center justify-center rounded-md px-4 py-2.5 text-sm font-black transition"
-      onClick={clearCardListNavigationState}
+      onClick={() => {
+        clearCardListNavigationState();
+        recordNavigationDebug("reset:all-cards-click", { targetPath: "/cards" });
+      }}
     >
       All cards
     </Link>
@@ -33,7 +37,14 @@ type SetResetLinkProps = {
 
 export function SetResetLink({ href, children, className }: SetResetLinkProps) {
   return (
-    <Link href={href} className={className} onClick={clearCardListNavigationState}>
+    <Link
+      href={href}
+      className={className}
+      onClick={() => {
+        clearCardListNavigationState();
+        recordNavigationDebug("reset:set-click", { targetPath: href });
+      }}
+    >
       {children}
     </Link>
   );

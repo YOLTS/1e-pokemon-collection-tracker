@@ -2,8 +2,17 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import {
+  backNavigationTransitionKey,
+  recordNavigationDebug,
+  writeNavigationTransition,
+} from "@/lib/navigation-debug";
 
 const cardListNavigationStateKey = "pokemonCardListNavigationState";
+const defaultTarget = {
+  href: "/cards",
+  label: "← Back to Card List",
+};
 
 type StoredNavigationTarget = {
   href: string;
@@ -23,7 +32,7 @@ function storedNavigationTarget(): StoredNavigationTarget | null {
     };
 
     if (typeof parsedValue.path === "string" && parsedValue.path.startsWith("/cards")) {
-      return { href: parsedValue.path, label: "← Back to Card List" };
+      return { href: parsedValue.path, label: defaultTarget.label };
     }
 
     if (typeof parsedValue.path === "string" && parsedValue.path.startsWith("/sets/")) {
@@ -44,19 +53,35 @@ function storedNavigationTarget(): StoredNavigationTarget | null {
   return null;
 }
 
+function initialNavigationTarget() {
+  return typeof window === "undefined" ? defaultTarget : storedNavigationTarget() ?? defaultTarget;
+}
+
 export function CardListBackLink() {
-  const [href, setHref] = useState("/cards");
-  const [label, setLabel] = useState("← Back to Card List");
+  const [target, setTarget] = useState(initialNavigationTarget);
 
   useEffect(() => {
-    const target = storedNavigationTarget();
-    setHref(target?.href ?? "/cards");
-    setLabel(target?.label ?? "← Back to Card List");
+    setTarget(storedNavigationTarget() ?? defaultTarget);
   }, []);
 
+  function handleBackClick() {
+    writeNavigationTransition(backNavigationTransitionKey, {
+      targetPath: target.href,
+      label: target.label,
+    });
+    recordNavigationDebug("back:navigate-start", {
+      targetPath: target.href,
+      label: target.label,
+    });
+  }
+
   return (
-    <Link href={href} className="btn-primary inline-flex items-center justify-center rounded-md px-4 py-2.5 text-sm font-black transition">
-      {label}
+    <Link
+      href={target.href}
+      className="btn-primary inline-flex items-center justify-center rounded-md px-4 py-2.5 text-sm font-black transition"
+      onClick={handleBackClick}
+    >
+      {target.label}
     </Link>
   );
 }

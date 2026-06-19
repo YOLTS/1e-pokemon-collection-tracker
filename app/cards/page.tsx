@@ -17,15 +17,19 @@ type CardsPageProps = {
 };
 
 export default async function CardsPage({ searchParams }: CardsPageProps) {
+  const pageStartedAt = Date.now();
   noStore();
 
+  const setsFetchStartedAt = Date.now();
   const sets = await prisma.pokemonSet.findMany({
     orderBy: { displayOrder: "asc" },
   });
+  const setsFetchMs = Date.now() - setsFetchStartedAt;
 
   const selectedSlug = searchParams.set ?? "all";
   const selectedSet = sets.find((set) => set.slug === selectedSlug);
 
+  const variantsFetchStartedAt = Date.now();
   const variants = await prisma.cardVariant.findMany({
     where: selectedSet
       ? {
@@ -55,6 +59,7 @@ export default async function CardsPage({ searchParams }: CardsPageProps) {
       },
     },
   });
+  const variantsFetchMs = Date.now() - variantsFetchStartedAt;
 
   const summary = summarizeVariants(variants);
   const rarityIntelligence = buildRarityIntelligence(variants);
@@ -68,6 +73,16 @@ export default async function CardsPage({ searchParams }: CardsPageProps) {
       ? `${highestPricedVariant.card.name} (${highestPricedVariant.card.set.name})`
       : null,
     highestPricedValue: highestPricedVariant ? getMarketPrice(highestPricedVariant) : null,
+  };
+  const serverPrepareMs = Date.now() - pageStartedAt;
+  const navigationDebugTiming = {
+    route: `/cards?set=${selectedSlug}`,
+    dataFetchMs: setsFetchMs + variantsFetchMs,
+    serverPrepareMs,
+    variantCount: variants.length,
+    selectedSet: selectedSet?.slug ?? null,
+    setsFetchMs,
+    variantsFetchMs,
   };
 
   return (
@@ -128,7 +143,12 @@ export default async function CardsPage({ searchParams }: CardsPageProps) {
       <RarityIntelligence rarities={rarityIntelligence} />
 
       {variants.length > 0 ? (
-        <VariantTable variants={variants} showSet={!selectedSet} pricingDebug={pricingDebug} />
+        <VariantTable
+          variants={variants}
+          showSet={!selectedSet}
+          pricingDebug={pricingDebug}
+          navigationDebugTiming={navigationDebugTiming}
+        />
       ) : (
         <section className="neon-panel rounded-lg p-8 text-center">
           <p className="font-semibold text-slate-400">No cards match this view.</p>
