@@ -174,6 +174,7 @@ export function OfflineModeClient() {
   });
   const [thumbnailCacheProgress, setThumbnailCacheProgress] = useState<ThumbnailCacheProgress | null>(null);
   const [isCachingAllThumbnails, setIsCachingAllThumbnails] = useState(false);
+  const [imageCacheRevision, setImageCacheRevision] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -287,6 +288,7 @@ export function OfflineModeClient() {
   async function refreshImageCacheStats() {
     const stats = await listCachedImageStats();
     setImageCacheStats(stats);
+    setImageCacheRevision((revision) => revision + 1);
     return stats;
   }
 
@@ -320,6 +322,11 @@ export function OfflineModeClient() {
 
   async function cacheAllThumbnailsForDebug() {
     if (!snapshot || isCachingAllThumbnails) {
+      return;
+    }
+
+    if (!online) {
+      setDebugMessage("Connect to the internet before caching all thumbnails for offline use.");
       return;
     }
 
@@ -687,6 +694,7 @@ export function OfflineModeClient() {
           navigate={navigate}
           toggleOfflineOwned={toggleOfflineOwned}
           editingVariantId={editingVariantId}
+          imageCacheRevision={imageCacheRevision}
         />
       ) : null}
 
@@ -698,6 +706,7 @@ export function OfflineModeClient() {
           editingVariantId={editingVariantId}
           updateOfflineMarketPrice={updateOfflineMarketPrice}
           editingPriceVariantId={editingPriceVariantId}
+          imageCacheRevision={imageCacheRevision}
         />
       ) : null}
     </div>
@@ -901,6 +910,7 @@ function OfflineCards({
   navigate,
   toggleOfflineOwned,
   editingVariantId,
+  imageCacheRevision,
 }: {
   title: string;
   query: string;
@@ -909,6 +919,7 @@ function OfflineCards({
   navigate: (view: OfflineView) => void;
   toggleOfflineOwned: (variant: OfflineVariant, owned: boolean) => void;
   editingVariantId: number | null;
+  imageCacheRevision: number;
 }) {
   const [ownedFilter, setOwnedFilter] = useState<OwnedFilter>("all");
   const [rarityFilter, setRarityFilter] = useState("all");
@@ -993,7 +1004,7 @@ function OfflineCards({
     return () => {
       cancelled = true;
     };
-  }, [displayedVariants]);
+  }, [displayedVariants, imageCacheRevision]);
 
   useEffect(() => {
     return () => {
@@ -1180,6 +1191,7 @@ function OfflineCardDetail({
   editingVariantId,
   updateOfflineMarketPrice,
   editingPriceVariantId,
+  imageCacheRevision,
 }: {
   variant: OfflineVariant;
   blockEdit: () => void;
@@ -1187,6 +1199,7 @@ function OfflineCardDetail({
   editingVariantId: number | null;
   updateOfflineMarketPrice: (variant: OfflineVariant, value: number) => void;
   editingPriceVariantId: number | null;
+  imageCacheRevision: number;
 }) {
   const owned = hasOfflineOwnedCopy(variant);
   const primaryCopy = getOfflinePrimaryCopy(variant);
@@ -1218,7 +1231,7 @@ function OfflineCardDetail({
         URL.revokeObjectURL(objectUrl);
       }
     };
-  }, [variant.card.id]);
+  }, [imageCacheRevision, variant.card.id]);
 
   function handlePriceSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

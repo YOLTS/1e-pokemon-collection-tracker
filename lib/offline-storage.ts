@@ -251,8 +251,9 @@ export async function cacheCardThumbnail(cardId: number, imageUrlSmall?: string 
 
   if (
     isCardImageBlobRecord(existingRecord) &&
+    existingRecord.status === "CACHED" &&
     existingRecord.url === imageUrlSmall &&
-    (existingRecord.status === "FAILED" || existingRecord.blob)
+    existingRecord.blob
   ) {
     return existingRecord;
   }
@@ -418,9 +419,9 @@ export async function cacheAllCardThumbnails(
   onProgress?: (progress: ThumbnailCacheProgress) => void,
 ) {
   const allThumbnailTargets = Array.from(
-    snapshot.variants.reduce((targets, variant) => {
-      if (variant.card.imageUrlSmall && !targets.has(variant.card.id)) {
-        targets.set(variant.card.id, variant.card.imageUrlSmall);
+    snapshot.cards.reduce((targets, card) => {
+      if (card.imageUrlSmall && !targets.has(card.id)) {
+        targets.set(card.id, card.imageUrlSmall);
       }
 
       return targets;
