@@ -1,4 +1,3 @@
-import { unstable_noStore as noStore } from "next/cache";
 import { notFound } from "next/navigation";
 import { updateVariantDetails } from "@/app/actions";
 import { AllCardsResetLink, SetResetLink } from "@/components/AllCardsResetLink";
@@ -11,7 +10,7 @@ import { formatCurrency, formatMarketPrice } from "@/lib/format";
 import { rarityToken } from "@/lib/rarity";
 import { prisma } from "@/lib/prisma";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 300;
 
 type CardDetailPageProps = {
   params: {
@@ -26,7 +25,6 @@ const conditionOptions = Object.values(CARD_CONDITION);
 
 export default async function CardDetailPage({ params, searchParams }: CardDetailPageProps) {
   const pageStartedAt = Date.now();
-  noStore();
 
   const variantId = Number(params.id);
   if (!Number.isInteger(variantId)) {
