@@ -39,6 +39,13 @@ export type CachedImageStats = {
   totalBytes: number;
 };
 
+export type CachedImageDebugSummary = CachedImageStats & {
+  totalSnapshotCards: number;
+  totalCardsWithImageUrlSmall: number;
+  ownedCachedCount: number;
+  unownedCachedCount: number;
+};
+
 export type ThumbnailCacheProgress = {
   totalEligible: number;
   processed: number;
@@ -323,6 +330,51 @@ export async function listCachedImageStats(): Promise<CachedImageStats> {
       }),
       { cachedCount: 0, failedCount: 0, totalBytes: 0 },
     );
+  });
+}
+
+export async function listCachedImageDebugSummary(snapshot: OfflineSnapshot): Promise<CachedImageDebugSummary> {
+  return withOfflineDatabase(async (database) => {
+    const transaction = database.transaction(cardImageBlobsStore, "readonly");
+    const request = transaction.objectStore(cardImageBlobsStore).getAll();
+    const records = (await requestResult(request)).filter(isCardImageBlobRecord);
+    const cachedCardIds = new Set(
+      records
+        .filter((record) => record.status === "CACHED" && record.blob)
+        .map((record) => record.cardId),
+    );
+    const ownedCardIds = new Set(
+      snapshot.variants
+        .filter((variant) => variant.ownedItems.some((item) => item.status === "OWNED"))
+        .map((variant) => variant.card.id),
+    );
+
+    const stats = records.reduce<CachedImageStats>(
+      (currentStats, record) => ({
+        cachedCount: currentStats.cachedCount + (record.status === "CACHED" ? 1 : 0),
+        failedCount: currentStats.failedCount + (record.status === "FAILED" ? 1 : 0),
+        totalBytes: currentStats.totalBytes + (record.status === "CACHED" ? record.sizeBytes : 0),
+      }),
+      { cachedCount: 0, failedCount: 0, totalBytes: 0 },
+    );
+
+    let ownedCachedCount = 0;
+    let unownedCachedCount = 0;
+    cachedCardIds.forEach((cardId) => {
+      if (ownedCardIds.has(cardId)) {
+        ownedCachedCount += 1;
+      } else {
+        unownedCachedCount += 1;
+      }
+    });
+
+    return {
+      ...stats,
+      totalSnapshotCards: snapshot.cards.length,
+      totalCardsWithImageUrlSmall: snapshot.cards.filter((card) => Boolean(card.imageUrlSmall)).length,
+      ownedCachedCount,
+      unownedCachedCount,
+    };
   });
 }
 

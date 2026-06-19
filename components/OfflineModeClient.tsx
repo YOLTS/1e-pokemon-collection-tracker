@@ -11,11 +11,13 @@ import {
   getCachedCardThumbnailObjectUrl,
   getCachedCardThumbnailObjectUrlMap,
   listAllPendingMutationDebugRecords,
+  listCachedImageDebugSummary,
   listCachedImageStats,
   listOfflineMutationDebugEvents,
   listPendingMutations,
   loadOfflineSnapshot,
   type CachedImageStats,
+  type CachedImageDebugSummary,
   type ThumbnailCacheProgress,
 } from "@/lib/offline-storage";
 import { syncPendingOfflineMutations } from "@/lib/offline-sync";
@@ -56,7 +58,19 @@ type OfflineDebugInfo = {
   serviceWorkerControlled: boolean;
   serviceWorkerDebug: string;
   imageCacheStats: CachedImageStats;
+  imageCacheDebugSummary: CachedImageDebugSummary | null;
   error?: string;
+};
+
+type AllThumbnailCacheRunStatus = "idle" | "started" | "running" | "complete" | "failed";
+
+type AllThumbnailCacheRunDebug = {
+  status: AllThumbnailCacheRunStatus;
+  message: string;
+  eligibleCount: number;
+  processedCount: number;
+  failedCount: number;
+  updatedAt: string | null;
 };
 
 function formatEnumLabel(value?: string | null) {
@@ -172,9 +186,18 @@ export function OfflineModeClient() {
     failedCount: 0,
     totalBytes: 0,
   });
+  const [imageCacheDebugSummary, setImageCacheDebugSummary] = useState<CachedImageDebugSummary | null>(null);
   const [thumbnailCacheProgress, setThumbnailCacheProgress] = useState<ThumbnailCacheProgress | null>(null);
   const [isCachingAllThumbnails, setIsCachingAllThumbnails] = useState(false);
   const [imageCacheRevision, setImageCacheRevision] = useState(0);
+  const [allThumbnailCacheRunDebug, setAllThumbnailCacheRunDebug] = useState<AllThumbnailCacheRunDebug>({
+    status: "idle",
+    message: "Not run in this session.",
+    eligibleCount: 0,
+    processedCount: 0,
+    failedCount: 0,
+    updatedAt: null,
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -247,7 +270,9 @@ export function OfflineModeClient() {
         setStatus("error");
       });
     refreshPendingMutationCountOnLoad();
-    refreshImageCacheStats().catch(() => undefined);
+    listCachedImageStats()
+      .then(setImageCacheStats)
+      .catch(() => undefined);
 
     return () => {
       cancelled = true;
@@ -256,6 +281,17 @@ export function OfflineModeClient() {
       navigator.serviceWorker?.removeEventListener("controllerchange", handleControllerChange);
     };
   }, []);
+
+  useEffect(() => {
+    if (!snapshot) {
+      setImageCacheDebugSummary(null);
+      return;
+    }
+
+    listCachedImageDebugSummary(snapshot)
+      .then(setImageCacheDebugSummary)
+      .catch(() => setImageCacheDebugSummary(null));
+  }, [imageCacheStats, snapshot]);
 
   function navigate(nextView: OfflineView) {
     setBlockedMessage("");
@@ -288,6 +324,10 @@ export function OfflineModeClient() {
   async function refreshImageCacheStats() {
     const stats = await listCachedImageStats();
     setImageCacheStats(stats);
+    if (snapshot) {
+      const debugSummary = await listCachedImageDebugSummary(snapshot);
+      setImageCacheDebugSummary(debugSummary);
+    }
     setImageCacheRevision((revision) => revision + 1);
     return stats;
   }
@@ -326,23 +366,64 @@ export function OfflineModeClient() {
     }
 
     if (!online) {
+      setAllThumbnailCacheRunDebug({
+        status: "failed",
+        message: "Cache all thumbnails requires an internet connection. Reconnect, open Local Data, then press the button again.",
+        eligibleCount: 0,
+        processedCount: 0,
+        failedCount: 0,
+        updatedAt: new Date().toISOString(),
+      });
       setDebugMessage("Connect to the internet before caching all thumbnails for offline use.");
       return;
     }
 
     setIsCachingAllThumbnails(true);
+    setAllThumbnailCacheRunDebug({
+      status: "started",
+      message: "Started cache-all thumbnail run.",
+      eligibleCount: 0,
+      processedCount: 0,
+      failedCount: 0,
+      updatedAt: new Date().toISOString(),
+    });
     setDebugMessage("Caching all thumbnails for offline use...");
 
     try {
       const result = await cacheAllCardThumbnails(snapshot, (progress) => {
         setThumbnailCacheProgress(progress);
+        setAllThumbnailCacheRunDebug({
+          status: progress.complete ? "complete" : "running",
+          message: progress.complete ? "Cache-all thumbnail run complete." : "Cache-all thumbnail run in progress.",
+          eligibleCount: progress.totalEligible,
+          processedCount: progress.processed,
+          failedCount: progress.failed,
+          updatedAt: new Date().toISOString(),
+        });
       });
       await refreshImageCacheStats();
+      const finalMessage = `Thumbnail cache complete. ${result.cached} cached, ${result.failed} failed, ${result.attempted} eligible.`;
+      setAllThumbnailCacheRunDebug({
+        status: "complete",
+        message: finalMessage,
+        eligibleCount: result.attempted,
+        processedCount: result.attempted,
+        failedCount: result.failed,
+        updatedAt: new Date().toISOString(),
+      });
       setDebugMessage(
-        `Thumbnail cache complete. ${result.cached} cached, ${result.failed} failed, ${result.attempted} eligible.`,
+        finalMessage,
       );
     } catch (error) {
       await refreshImageCacheStats().catch(() => undefined);
+      setAllThumbnailCacheRunDebug({
+        status: "failed",
+        message: error instanceof Error ? error.message : "Thumbnail cache failed.",
+        eligibleCount: thumbnailCacheProgress?.totalEligible ?? 0,
+        processedCount: thumbnailCacheProgress?.processed ?? 0,
+        failedCount: thumbnailCacheProgress?.failed ?? 0,
+        updatedAt: new Date().toISOString(),
+      });
       setDebugMessage(error instanceof Error ? error.message : "Thumbnail cache failed.");
     } finally {
       setIsCachingAllThumbnails(false);
@@ -509,6 +590,7 @@ export function OfflineModeClient() {
     serviceWorkerControlled,
     serviceWorkerDebug,
     imageCacheStats,
+    imageCacheDebugSummary,
     error: loadError || undefined,
   };
 
@@ -529,6 +611,7 @@ export function OfflineModeClient() {
           onCacheAllThumbnails={cacheAllThumbnailsForDebug}
           thumbnailCacheProgress={thumbnailCacheProgress}
           isCachingAllThumbnails={isCachingAllThumbnails}
+          allThumbnailCacheRunDebug={allThumbnailCacheRunDebug}
         />
       </section>
     );
@@ -556,6 +639,7 @@ export function OfflineModeClient() {
           onCacheAllThumbnails={cacheAllThumbnailsForDebug}
           thumbnailCacheProgress={thumbnailCacheProgress}
           isCachingAllThumbnails={isCachingAllThumbnails}
+          allThumbnailCacheRunDebug={allThumbnailCacheRunDebug}
         />
       </section>
     );
@@ -582,6 +666,7 @@ export function OfflineModeClient() {
           onCacheAllThumbnails={cacheAllThumbnailsForDebug}
           thumbnailCacheProgress={thumbnailCacheProgress}
           isCachingAllThumbnails={isCachingAllThumbnails}
+          allThumbnailCacheRunDebug={allThumbnailCacheRunDebug}
         />
       </section>
     );
@@ -674,6 +759,7 @@ export function OfflineModeClient() {
           onCacheAllThumbnails={cacheAllThumbnailsForDebug}
           thumbnailCacheProgress={thumbnailCacheProgress}
           isCachingAllThumbnails={isCachingAllThumbnails}
+          allThumbnailCacheRunDebug={allThumbnailCacheRunDebug}
         />
       </section>
 
@@ -1350,6 +1436,7 @@ function OfflineDebugPanel({
   onCacheAllThumbnails,
   thumbnailCacheProgress,
   isCachingAllThumbnails = false,
+  allThumbnailCacheRunDebug,
 }: {
   debugInfo: OfflineDebugInfo;
   pendingMutations?: OfflineMutation[];
@@ -1363,6 +1450,7 @@ function OfflineDebugPanel({
   onCacheAllThumbnails?: () => Promise<void>;
   thumbnailCacheProgress?: ThumbnailCacheProgress | null;
   isCachingAllThumbnails?: boolean;
+  allThumbnailCacheRunDebug?: AllThumbnailCacheRunDebug;
 }) {
   return (
     <details className="mt-4 rounded-md border border-white/[0.08] bg-slate-950/60 px-3 py-2 text-xs text-slate-400">
@@ -1385,6 +1473,22 @@ function OfflineDebugPanel({
         <div>
           <dt className="font-bold text-slate-500">Cached thumbnails</dt>
           <dd>{debugInfo.imageCacheStats.cachedCount}</dd>
+        </div>
+        <div>
+          <dt className="font-bold text-slate-500">Snapshot cards</dt>
+          <dd>{debugInfo.imageCacheDebugSummary?.totalSnapshotCards ?? "-"}</dd>
+        </div>
+        <div>
+          <dt className="font-bold text-slate-500">Cards with imageUrlSmall</dt>
+          <dd>{debugInfo.imageCacheDebugSummary?.totalCardsWithImageUrlSmall ?? "-"}</dd>
+        </div>
+        <div>
+          <dt className="font-bold text-slate-500">Owned cached</dt>
+          <dd>{debugInfo.imageCacheDebugSummary?.ownedCachedCount ?? "-"}</dd>
+        </div>
+        <div>
+          <dt className="font-bold text-slate-500">Unowned cached</dt>
+          <dd>{debugInfo.imageCacheDebugSummary?.unownedCachedCount ?? "-"}</dd>
         </div>
         <div>
           <dt className="font-bold text-slate-500">Image cache bytes</dt>
@@ -1481,6 +1585,37 @@ function OfflineDebugPanel({
                   - {thumbnailCacheProgress.processed}/{thumbnailCacheProgress.totalEligible} processed,{" "}
                   {thumbnailCacheProgress.cached} cached, {thumbnailCacheProgress.failed} failed
                 </p>
+              </dd>
+            ) : null}
+            {allThumbnailCacheRunDebug ? (
+              <dd className="mt-2 rounded-md border border-fuchsia-300/10 bg-slate-950/80 p-2">
+                <p className="font-bold text-slate-500">Last all-cache run</p>
+                <dl className="mt-1 grid gap-1 sm:grid-cols-2">
+                  <div>
+                    <dt className="font-bold text-slate-500">Status</dt>
+                    <dd>{allThumbnailCacheRunDebug.status}</dd>
+                  </div>
+                  <div>
+                    <dt className="font-bold text-slate-500">Eligible</dt>
+                    <dd>{allThumbnailCacheRunDebug.eligibleCount}</dd>
+                  </div>
+                  <div>
+                    <dt className="font-bold text-slate-500">Processed</dt>
+                    <dd>{allThumbnailCacheRunDebug.processedCount}</dd>
+                  </div>
+                  <div>
+                    <dt className="font-bold text-slate-500">Failed</dt>
+                    <dd>{allThumbnailCacheRunDebug.failedCount}</dd>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <dt className="font-bold text-slate-500">Message</dt>
+                    <dd>{allThumbnailCacheRunDebug.message}</dd>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <dt className="font-bold text-slate-500">Updated</dt>
+                    <dd>{allThumbnailCacheRunDebug.updatedAt ?? "-"}</dd>
+                  </div>
+                </dl>
               </dd>
             ) : null}
             {pendingCountEvents.length > 0 ? (
